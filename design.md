@@ -75,8 +75,8 @@ ring-modulated. [Decided: two lines, called lines]
 - **Ring**: line 2 is multiplied by line 1. **Noise**: line 2's pitch is jittered by noise, as on
   the CZ. [Decided]
 - **Detune** between lines: in cents, plus octave and fifth steps. [Decided]
-- **Voices**: 8 in Poly, 1 in Mono with glide and legato. [Decided as the start; the Mac benchmark
-  sets the final count]
+- **Voices**: 8 in Poly, 1 in Mono with glide and legato. [Decided; batch 05 benchmark on the Intel
+  Mac runner, checked again after the C++ port]
 
 ## 4. Warp (phase distortion)
 
@@ -323,7 +323,8 @@ numbers in `tests.md`]
   worse (the steep peaks of a Pulse into Chebyshev aliased at −32 dB instead of −66), so only those
   places split.
 - **Oversampling.** 4× with a windowed-sinc decimator, the same as Throat and Syrinx. An Eco mode
-  at 2× comes only if performance is bad on the Mac. [Decided]
+  at 2× comes only if performance is bad on the Mac. Batch 05: not needed for now; checked again
+  with the C++ port. [Decided]
 - **Twist.** Each ADAA stage adds half a sample of delay, and inside the loop that changes the
   loop. So Twist relies on oversampling and its low-pass, not on ADAA.
 - **Result** (`tools/alias.js`: 10 waves × 7 shapers × Warp ½ and 1 × MIDI 24, 48, 72, 96, 108):
@@ -434,8 +435,10 @@ Same rules as Throat and Syrinx. [Decided]
 - Cosine is read from a table; the Chebyshev sum uses Clenshaw's recurrence.
 - Code ported from MAME keeps its BSD-3-Clause notice in the file.
 - Idle voices and lines do no work.
-- **Cost estimate** (research pass, not measured): about 150–250 operations per sample per line at
-  2×, roughly double with Twist. The Mac benchmark sets the voice count.
+- **Cost** (batch 05, JavaScript reference on GitHub's Intel Mac, an i7-8700B): 3–8% of one core per
+  line per voice, 43–46% for 8 voices in the worst case; full voices projected at 95–119% in
+  JavaScript. The C++ port is measured on the same runner.
+- **Mac runs happen on GitHub Actions** (`macos-26-intel`), never by hand.
 
 Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff`, `setBend`,
 `process(L, R, n)`.
@@ -446,5 +449,5 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 2. Morph: which method sounds like one wave turning inside out (bench).
 3. Twist: what it sounds like across pitches and shapers (listening).
 4. Which out-of-bounds warp families ship (listening).
-5. Eco (2×) mode: only if performance is bad on the Mac.
-6. Voice count: 8 to start, the Mac benchmark decides.
+5. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
+6. How many voices the browser bench plays.

@@ -4,7 +4,53 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 87 engine tests passing** (about 12 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute).
+**Now: 87 engine tests passing** (about 12 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 05 · cost
+
+`tools/perf.js` measures the share of one CPU core each scenario needs at 48 kHz, best of two
+3-second runs. It runs on every push on GitHub Actions, on `macos-26-intel`: an Intel Core
+i7-8700B at 3.2 GHz (a 2018 Mac mini), Node 22. The run posts the numbers as an annotation and
+keeps the test-preset WAVs as an artifact. (The run's plain log can't be read from here; the
+annotation can, as in kanopy.)
+
+First run, then after two rounds of speed-ups that leave every render bit-identical:
+
+| Scenario (Intel Mac) | Before | After |
+|---|---|---|
+| 1 voice, Saw, no shaper | 6.1%* | 3.0–3.6% |
+| 1 voice, Chebyshev 16 harmonics | 11.3%* | 5.3–6.1% |
+| 1 voice, Fold Sine | 14.8%* | 4.9–5.8% |
+| 1 voice, Tanh | 12.7%* | 5.2–6.5% |
+| 8 voices, Saw, no shaper | 47.6%* | 15.6–21.3% |
+| 8 voices, worst (Tanh or Chebyshev with Warp, Shape and Morph moving) | 92.9%* | 43–46% |
+
+\* measured on this machine's Xeon before the Mac workflow existed; the two Mac runs differ by up
+to 25%, which is the shared runner's noise.
+
+The speed-ups, all exact:
+- F at a step's start is F at the last step's end when Shape hasn't moved (half the antiderivative
+  work).
+- The Chebyshev antiderivative's coefficients, the fold gain 10^Shape and the saturator's
+  full-scale value are kept until Shape changes.
+- The pivot, resonance ratio and band limit are only recomputed when Warp, Shape or the pitch
+  move.
+
+Most of the remaining time is maths functions (powers, sines, arcsines, logs) per sample.
+
+**Projection for a full voice** (two lines, and Twist at about +30%): 12–15% of the Intel Mac's
+core per voice in the JavaScript reference, so 95–119% of one core for 8 voices in the worst case.
+
+Decisions:
+- **8 voices stay.** The plugin runs the C++ port, which should be several times faster than the
+  JavaScript reference: roughly 25–60% of one core for 8 full voices in the worst case. Checked
+  again on the same runner after the port (batch 11).
+- **No Eco (2×) mode for now.** The cost is in the maths per sample, not in the oversampling alone,
+  and 4× is affordable. Revisited after the C++ numbers.
+- **The browser bench (batch 10)** runs the JavaScript engine, so 8 full voices in the worst case
+  would not keep up there. The bench may play fewer voices; decided when it is built.
+
+Renders: unchanged from batch 04 (bit-identical).
 
 ## Batch 04 · band limiting
 
