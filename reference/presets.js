@@ -225,7 +225,7 @@
       about: 'Shape → Warp, definition ' + n + ' (' + how + '): a warped Saw with the Sine fold on its phase. The Shape envelope opens on each note. Compare with the other letter.',
       params: {
         wave1: 0, warp1: 0.6, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.1, senvdepth1: 0.8, shapekey1: 0, velshape1: 0,
-        order1: 1, swdef1: def,
+        order1: 1, swmode1: def,
         ...env('senv', 1, [[0.6, 1], [1.2, 0.3]], 2, 3),
         ...env('aenv', 1, [[0.01, 1], [1.5, 0.85], [0.3, 0]], 2, 3),
       },
@@ -237,7 +237,7 @@
       about: 'A warped Saw with the Sine fold, Morph moving 0 → 1 → 0 (' + how + '). Definition B. An LFO will do this from batch 09; here a sweep stands in.',
       params: {
         wave1: 0, warp1: 0.65, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0,
-        order1: 2, ordermorph1: 0, morphway1: way, swdef1: 1, volume: -9,
+        order1: 2, ordermorph1: 0, morphway1: way, swmode1: 1, volume: -9,
         ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
       },
       phrase: [[43, 0, 6.2], [50, 0, 6.2]],

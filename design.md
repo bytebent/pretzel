@@ -223,21 +223,22 @@ Pretzel's first headline. [Decided; built in batch 07]
 | **Shape → Warp** | The shaper works on the phase, then the warp reads it | Closer to FM: brighter, with more movement |
 | **Morph** | A true morph between the two | Not a crossfade |
 
-**Shape → Warp: two definitions**, behind a temporary switch (`swdef`) until the listening round
-picks one or both. Both leave the plain phase at Shape 0, so every order is the same wave there.
+**Shape → Warp: two modes, both kept** as a switch (`swmode`) after the batch 07 listening: each
+sounded worth having. Both leave the plain phase at Shape 0, so every order is the same wave there.
+[Decided]
 
-- **A. The shaped wave becomes the phase.** The plain cosine is shaped, and the result is read back
+- **Read (A). The shaped wave becomes the phase.** The plain cosine is shaped, and the result is read back
   as the phase a plain cosine would need to make it (acos, one branch per half cycle); the warp then
   reads that phase. At Warp 0 this is exactly Warp → Shape; with a warp it is the warp read along the
   shaped wave. Chebyshev harmonic k makes the phase k times as fast, folded back. (The first form,
   u = ½(S(cos 2πφ) + 1), reads a cosine of a cosine even at Shape 0, so it was changed.) The phase
   can jump at ½ and at the end of the cycle, where the branches meet; the sample is split there.
-- **B. The shaper bends the phase ramp.** u = ½(S(2φ − 1) + 1), then the warp reads u: two phase
+- **Bend (B). The shaper bends the phase ramp.** u = ½(S(2φ − 1) + 1), then the warp reads u: two phase
   warps in a row (nested phaseshaping, Kleimola and others, SMC 2010). The phase can jump at the end
   of the cycle; split there.
 
 **Morph.** One knob, t from 0 to 1: Warp → Shape at 0, Shape → Warp at 1. Two ways, behind a
-temporary switch (`morphway`) until the listening round picks:
+switch (`morphway`), both kept after the batch 07 listening [Decided]:
 
 - **Through the warp.** From 0 to ½ the shaper leaves the output; from ½ to 1 it enters the phase.
   The middle is the warp alone, so the sound turns inside out through its plain self.
@@ -250,8 +251,8 @@ Shape), so the cost is that of both shapers at once at most.
 under the pitch cap on its own (Chebyshev harmonic 16 on the ramp, B, steepens it 256 times), and
 the warp's cap is divided by both shapers' steepening. Aliasing (`docs/tests/07-alias-orders.txt`):
 447 of 600 order settings below −60 dB; the worst, −27 dB, are folds on the phase (the Triangle fold
-most) with Vector, Sync or windowed Resonance at MIDI 48 and up. B aliases less than A.
-[Open: improve whichever definition ships]
+most) with Vector, Sync or windowed Resonance at MIDI 48 and up. Bend aliases less than Read.
+[Open: smoothing the phase shaper's creases, if they are heard]
 
 ## 7. Twist (feedback)
 
@@ -393,7 +394,8 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | | `shapekey` | 0–1 | 0.3 | Key follow |
 | Knot | `order` | Warp→Shape, Shape→Warp, Morph | Warp→Shape | |
 | | `ordermorph` | 0–1 | 0 | M. Morph position |
-| | `swdef`, `morphway` | A, B; Through the warp, Shared | A; Through | Temporary: bench only, until the listening round picks |
+| | `swmode` | Read, Bend | Read | How Shape → Warp works |
+| | `morphway` | Through the warp, Shared | Through | How Morph moves the shaper |
 | | `twist` | 0–1 | 0 | M. Feedback into phase |
 | Envelopes | `penv`, `wenv`, `senv`, `aenv` | 8 × rate/level, sustain, end | CZ-like | Pitch, Warp, Shape, Amp |
 | | `penvdepth` | ±24 st | 0 | |
@@ -468,8 +470,7 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 
 ## 14. Open
 
-1. Shape → Warp: definition A, B, or both (listening; B aliases less).
-2. Morph: through the warp or shared (listening).
-3. Twist: what it sounds like across pitches and shapers (listening).
-4. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
-5. How many voices the browser bench plays.
+1. Twist: what it sounds like across pitches and shapers (listening).
+2. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
+3. How many voices the browser bench plays.
+4. Smoothing the creases of a fold on the phase (Shape → Warp), if they are heard.

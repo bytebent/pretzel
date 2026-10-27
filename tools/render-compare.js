@@ -50,10 +50,10 @@ function both(name, a, b, phrase, sweeps, len) {
 }
 AB.forEach(([n, p, phrase], i) => {
   const end = Math.max(...phrase.map(([, t, d]) => t + d)) + 0.5;
-  both('A' + (i + 1) + ' ' + n + ' (A then B)', { ...COMMON, ...p, order1: 1, swdef1: 0 }, { ...COMMON, ...p, order1: 1, swdef1: 1 }, phrase, null, end);
+  both('A' + (i + 1) + ' ' + n + ' (A then B)', { ...COMMON, ...p, order1: 1, swmode1: 0 }, { ...COMMON, ...p, order1: 1, swmode1: 1 }, phrase, null, end);
 });
 WAYS.forEach(([n, p], i) => {
   const sweeps = [{ id: 'ordermorph1', from: 0, to: 1, start: 0.2, end: 2.0 }, { id: 'ordermorph1', from: 1, to: 0, start: 2.0, end: 3.8 }];
-  const base = { ...COMMON, ...p, ...HOLD, order1: 2, ordermorph1: 0, swdef1: 1, volume: -9 };
+  const base = { ...COMMON, ...p, ...HOLD, order1: 2, ordermorph1: 0, swmode1: 1, volume: -9 };
   both('M' + (i + 1) + ' ' + n + ' (through the warp, then shared)', { ...base, morphway1: 0 }, { ...base, morphway1: 1 }, [[45, 0, 4.0], [52, 0, 4.0]], sweeps, 4.4);
 });

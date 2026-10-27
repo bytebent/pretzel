@@ -9,7 +9,7 @@ the ones marked `design` are those of `design.md` §11.
 ## Batch 07 · order
 
 Warp → Shape, Shape → Warp (definitions A and B) and Morph (through the warp, or shared), with A/B
-and the Morph way on temporary switches.
+and the Morph way on switches. After listening, all four stay: A is called Read, B Bend.
 
 ![One cycle of a warped Saw through three shapers, in each order](docs/tests/07-orders.png)
 

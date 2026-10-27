@@ -531,14 +531,14 @@
   }
 
   /* ---------- order: the shaper before the warp (batch 07) ---------- */
-  // Shape → Warp puts the shaper on the phase. Two definitions, behind a temporary switch until the
-  // listening round picks (design.md §6). Both leave the phase as it is at Shape 0.
-  //   A: the shaped wave becomes the phase. The plain cosine x = −cos 2πφ is shaped, and the result
+  // Shape → Warp puts the shaper on the phase, in one of two modes, both kept as a switch after
+  // listening (design.md §6). Both leave the phase as it is at Shape 0.
+  //   Read (A): the shaped wave becomes the phase. The plain cosine x = −cos 2πφ is shaped, and the result
   //      is read back as the phase a plain cosine would need to make it (acos), so the warp then reads
   //      the shaped wave's own phase. At Warp 0 this gives exactly Warp → Shape.
   //      (Taken literally, u = ½(S(cos 2πφ) + 1) is not the plain phase even at Shape 0: it reads a
   //      cosine of a cosine.)
-  //   B: the shaper bends the phase ramp: u = ½(S(2φ − 1) + 1), two phase warps in a row.
+  //   Bend (B): the shaper bends the phase ramp: u = ½(S(2φ − 1) + 1), two phase warps in a row.
   const ORDERS = ['Warp→Shape', 'Shape→Warp', 'Morph'];
   function prePhase(sh, ph, s, def) {
     if (def === 1) return clamp(0.5 * (shapeSample(sh, 2 * ph - 1, s) + 1), 0, 1);
@@ -649,8 +649,8 @@
     { id: 'morph1', def: 0, min: 0, max: 1 },                    // through the drawn keyframes
     { id: 'order1', def: 0, min: 0, max: 2, step: 1 },           // ORDERS
     { id: 'ordermorph1', def: 0, min: 0, max: 1 },               // Morph: 0 Warp→Shape … 1 Shape→Warp
-    { id: 'swdef1', def: 0, min: 0, max: 1, step: 1 },           // TEMPORARY (bench only): Shape→Warp definition A, B
-    { id: 'morphway1', def: 0, min: 0, max: 1, step: 1 },        // TEMPORARY (bench only): Morph through the warp, shared
+    { id: 'swmode1', def: 0, min: 0, max: 1, step: 1 },          // Shape→Warp: Read (A), Bend (B)
+    { id: 'morphway1', def: 0, min: 0, max: 1, step: 1 },        // Morph: Through the warp, Shared
     { id: 'shapekey1', def: 0.3, min: 0, max: 1 },               // key follow: less shape above middle C
     { id: 'senvdepth1', def: 0, min: -1, max: 1 },
     { id: 'link1', def: 0, min: -1, max: 1 },                    // the Warp envelope also drives Shape
@@ -794,7 +794,7 @@
       k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
       k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
       k.order = Math.round(P[PINDEX.order1]); k.tm = P[PINDEX.ordermorph1];
-      k.def = Math.round(P[PINDEX.swdef1]); k.way = Math.round(P[PINDEX.morphway1]);
+      k.def = Math.round(P[PINDEX.swmode1]); k.way = Math.round(P[PINDEX.morphway1]);
       this.pre.def = k.def;
       const pr = Math.round(P[PINDEX.pair1]);
       k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);

@@ -93,7 +93,7 @@ const NOTES = [24, 48, 72, 96, 108];
 if (require.main === module) {
   if (process.argv.includes('--orders')) {
     // the orders (batch 07) on a few waves at full Warp
-    const ORD = [['S→W A', { order1: 1, swdef1: 0 }], ['S→W B', { order1: 1, swdef1: 1 }], ['Morph ½ shared A', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 0 }], ['Morph ½ shared B', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 1 }]];
+    const ORD = [['S→W A', { order1: 1, swmode1: 0 }], ['S→W B', { order1: 1, swmode1: 1 }], ['Morph ½ shared A', { order1: 2, ordermorph1: 0.5, morphway1: 1, swmode1: 0 }], ['Morph ½ shared B', { order1: 2, ordermorph1: 0.5, morphway1: 1, swmode1: 1 }]];
     const W = [['Saw', { wave1: 0 }], ['Square', { wave1: 1 }], ['Reso+Tri', { wave1: 5, window1: 2 }], ['Vector (0.2, 2.5)', FAMILIES[0][1]], ['Sync 7.3', FAMILIES[5][1]]];
     console.log('alias energy, dB below the harmonics (20 Hz – 20 kHz), Warp 1; notes ' + NOTES.join(', '));
     let worst = -Infinity, wn = '';
