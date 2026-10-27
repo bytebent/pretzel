@@ -502,5 +502,5 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 1. Twist: what it sounds like across pitches and shapers, and where the chaos should start (listening).
 2. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
 3. ~~How many voices the browser bench plays.~~ Settled in batch 10: 4 by default, with a 2 / 4 / 8
-   switch on the Voice page (the JavaScript engine needs about 20% of a core per full voice).
+   switch on the Voice page (the JavaScript engine needs 18–24% of a core per full voice on the Intel Mac).
 4. Smoothing the creases of a fold on the phase (Shape → Warp), if they are heard.

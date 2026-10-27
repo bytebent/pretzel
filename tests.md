@@ -21,6 +21,9 @@ the ones marked `design` are those of `design.md` §11.
 - **In Chromium** (headless, `tools/bench/check.js`): powers on, plays every preset, opens every
   page. No console errors or warnings; every preset sounds. Highest DSP reading 62% of a core (this
   container, 4 voices).
+- **Intel Mac run** (i7-8700B): 125 engine and 5 bench tests pass. A full voice took 24% of a core
+  this run (18% last batch: the runner varies). So 4 voices of the heaviest patch is about one core
+  in JavaScript; most presets need far less. Hence 4 voices by default.
 - Every engine parameter has a control: a knob, a switch, or the envelope, harmonic or keyframe
   editors. The page warns in the console if one is missing; none are.
 
