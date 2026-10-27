@@ -32,7 +32,8 @@ each with destinations on either line.
   bit-identical to the old programmed sweep), and Turning moves Morph with a slow triangle LFO.
 - **Cost of a full voice**, measured for the first time (two lines, shared Morph, Twist, both LFOs
   and mod envelopes, 8 voices): 159% of one core here in JavaScript, 20% per voice, as batch 05's
-  projection said. The C++ port decides the voice count (batch 11).
+  projection said. On GitHub's Intel Mac: 148%, 18.5% per voice. The C++ port decides the voice
+  count (batch 11).
 
 ![Spectrograms of the new presets, and the new Vowel and Turning](docs/tests/09-spectrograms.png)
 
