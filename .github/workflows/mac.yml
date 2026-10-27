@@ -1,0 +1,44 @@
+name: mac
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-and-bench:
+    runs-on: macos-26-intel  # Intel, like the owner's laptop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Machine
+        run: |
+          sysctl -n machdep.cpu.brand_string
+          sysctl -n hw.ncpu hw.memsize
+          node --version
+      - name: Engine tests
+        run: node tests/engine-test.js | tee tests.txt
+      - name: Benchmark
+        run: node tools/perf.js 3 | tee bench.txt
+      - name: Render the test presets
+        run: node tools/render-presets.js | tee renders.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: |
+            tests.txt
+            bench.txt
+            renders.txt
+            renders/*.wav
+      - name: Post results as an annotation (readable from the API)
+        if: always()
+        run: |
+          {
+            sysctl -n machdep.cpu.brand_string
+            tail -1 tests.txt
+            cat bench.txt
+          } > results.txt
+          body=$(sed -e 's/%/%25/g' results.txt | awk '{printf "%s%%0A", $0}')
+          echo "::notice title=pretzel bench::${body}"

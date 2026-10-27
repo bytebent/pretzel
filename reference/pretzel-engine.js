@@ -265,6 +265,7 @@
   // c: scratch for the weights at the current Shape; dy, dF: the morphed drawn curve and its F1.
   function makeShaper() {
     return {
+      ver: 0, lv: NaN, lf: 0, ls: 0, lver: -1, lp: 0, dS: NaN, dP: NaN, dV: -1, gS: NaN, g: 1,
       fam: 0, sub: 0, bias: 0, fpk: 0, dmax: 1, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), d: new Float64Array(NH + 3),
       dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1),
     };
@@ -282,7 +283,7 @@
         return v * b1 - b2;
       }
       case 1: {                         // Fold
-        const g = Math.pow(FOLD_MAX, s);   // 1 → 10, evenly in log: 1.8 at Shape ¼, 3.2 at ½
+        const g = foldGain(sh, s);         // 1 → 10, evenly in log: 1.8 at Shape ¼, 3.2 at ½
         if (sh.sub === 0) return triFold(g * v);
         if (sh.sub === 1) return Math.sin(g * Math.asin(clamp(v, -1, 1)));
         // the Lockhart stages bend slightly even at gain 1; adding back that bend keeps Shape 0 exact
@@ -332,7 +333,7 @@
     switch (sh.fam) {
       case 0: return clenshaw0(sh.d, NH + 1, v);
       case 1: {
-        const g = Math.pow(FOLD_MAX, s);
+        const g = foldGain(sh, s);
         if (sh.sub === 0) return triFoldF(g * v) / g;
         if (sh.sub === 1) {
           // ∫ sin(g·asin v) dv = −cos((g+1)θ)/(2(g+1)) − cos((g−1)θ)/(2(g−1)), θ = asin v; the second term
@@ -353,14 +354,26 @@
   // first-order antiderivative antialiasing (Parker, Zavalishin & Le Bivic 2016) between the last two
   // inputs x0 → x1: the shaper averaged over the straight line between them. Shape 0 and Bias 0 give
   // the plain average, the same half-sample delay as every shaper.
+  // Two caches keep the cost down without changing a single value: F at the step's start is F at the
+  // last step's end when nothing else changed, and the Chebyshev antiderivative's coefficients are
+  // only rebuilt when Shape or the band limit moves. sh.ver changes every block (new settings).
   function shapeADAA(sh, x0, x1, s) {
     const b = sh.bias;
-    if (s === 0 && b === 0) return 0.5 * (x0 + x1);
+    if (s === 0 && b === 0) { sh.lv = NaN; return 0.5 * (x0 + x1); }
     const k = b === 0 ? 1 : 1 / (1 + Math.abs(b));
     const v0 = (x0 + b) * k, v1 = (x1 + b) * k, dv = v1 - v0;
-    if (Math.abs(dv) < ADAA_EPS) return shapeSample(sh, 0.5 * (x0 + x1), s);
-    if (sh.fam === 0) chebAntiCoeffs(chebNow(sh, s), sh.d);
-    return (shapeAnti(sh, v1, s) - shapeAnti(sh, v0, s)) / dv;
+    if (Math.abs(dv) < ADAA_EPS) { sh.lv = NaN; return shapeSample(sh, 0.5 * (x0 + x1), s); }
+    if (sh.fam === 0 && (s !== sh.dS || sh.fpk !== sh.dP || sh.ver !== sh.dV)) {
+      chebAntiCoeffs(chebNow(sh, s), sh.d); sh.dS = s; sh.dP = sh.fpk; sh.dV = sh.ver;
+    }
+    const same = v0 === sh.lv && s === sh.ls && sh.ver === sh.lver && sh.fpk === sh.lp;
+    const F0 = same ? sh.lf : shapeAnti(sh, v0, s), F1 = shapeAnti(sh, v1, s);
+    sh.lv = v1; sh.lf = F1; sh.ls = s; sh.lver = sh.ver; sh.lp = sh.fpk;
+    return (F1 - F0) / dv;
+  }
+  function foldGain(sh, s) {
+    if (s !== sh.gS) { sh.gS = s; sh.g = Math.pow(FOLD_MAX, s); }
+    return sh.g;
   }
   // how much the shaper steepens the wave at Shape s (its largest slope): a fold of gain g makes every
   // frequency g times higher, a saturator d/f(d) times near zero. The warp's pitch cap and the
@@ -368,7 +381,7 @@
   // fold can take. Chebyshev has its own band limit (the harmonic fade) and counts as 1.
   function expansion(sh, s) {
     switch (sh.fam) {
-      case 1: return Math.pow(FOLD_MAX, s);
+      case 1: return foldGain(sh, s);
       case 2: { const d = SAT_MAX * s * s; return d < 1e-6 ? 1 : d * (sh.sub === 2 ? 1.5 : 1 / satCurve(sh.sub, d)); }
       case 3: return Math.max(1, 1 - s + s * sh.dmax);
     }
@@ -649,6 +662,7 @@
       k.splitEnd = k.win !== 0 || k.w0 === 5 || k.w1 === 5 || k.splitP;   // Double pulse at p = ½ jumps at the end
       // the shaper
       const sh = this.sh;
+      sh.ver++;
       sh.fam = Math.round(P[PINDEX.sfamily1]); sh.bias = P[PINDEX.bias1];
       sh.sub = sh.fam === 1 ? Math.round(P[PINDEX.fold1]) : sh.fam === 2 ? Math.round(P[PINDEX.sat1]) : 0;
       if (sh.fam === 0) {
@@ -719,13 +733,15 @@
       const dg = (g1 - g) / n;
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
       const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
+      let wa = NaN, ws = NaN;
       for (let i = 0; i < n; i++) {
         const fri = fr0 + dfr * (i + 1), q = fri / fr1, inc = fri;
         k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
         const we = wenv.next(), se = senv.next(), ae = aenv.next();
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
         const s = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
-        this.warpPoint(a, expansion(sh, s));
+        // the pivot, resonance ratio and band limit only change when Warp, Shape or the pitch does
+        if (a !== wa || s !== ws || dfr !== 0) { this.warpPoint(a, expansion(sh, s)); wa = a; ws = s; }
         const p = this.wp, kr = this.wk;
         // advance the phase; the new sample x0 is the naive wave
         const prev = ph, wPrev = odd ? w1 : w0;
