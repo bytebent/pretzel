@@ -91,6 +91,20 @@ const SHAPERS = [
 const NOTES = [24, 48, 72, 96, 108];
 
 if (require.main === module) {
+  if (process.argv.includes('--orders')) {
+    // the orders (batch 07) on a few waves at full Warp
+    const ORD = [['S→W A', { order1: 1, swdef1: 0 }], ['S→W B', { order1: 1, swdef1: 1 }], ['Morph ½ shared A', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 0 }], ['Morph ½ shared B', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 1 }]];
+    const W = [['Saw', { wave1: 0 }], ['Square', { wave1: 1 }], ['Reso+Tri', { wave1: 5, window1: 2 }], ['Vector (0.2, 2.5)', FAMILIES[0][1]], ['Sync 7.3', FAMILIES[5][1]]];
+    console.log('alias energy, dB below the harmonics (20 Hz – 20 kHz), Warp 1; notes ' + NOTES.join(', '));
+    let worst = -Infinity, wn = '';
+    for (const [on, op] of ORD) for (const [sn, sp] of SHAPERS.slice(1)) for (const [wname, wp] of W) {
+      const row = NOTES.map((n) => measure({ ...wp, ...sp, ...op, warp1: 1 }, n));
+      const m = Math.max(...row); if (m > worst) { worst = m; wn = on + ' · ' + sn + ' · ' + wname + ' · MIDI ' + NOTES[row.indexOf(m)]; }
+      console.log((on + ' · ' + sn + ' · ' + wname).padEnd(46), row.map((v) => v.toFixed(0).padStart(5)).join(''));
+    }
+    console.log('\nworst: ' + worst.toFixed(1) + ' dB  (' + wn + ')');
+    process.exit(0);
+  }
   const quick = process.argv.includes('--quick');
   const only = process.argv.includes('--families');
   const waves = only ? FAMILIES : WAVES.concat(FAMILIES);

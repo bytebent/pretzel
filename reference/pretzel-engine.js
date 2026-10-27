@@ -530,12 +530,43 @@
     sh.dmax = mx * CURVE_N / 2;
   }
 
+  /* ---------- order: the shaper before the warp (batch 07) ---------- */
+  // Shape → Warp puts the shaper on the phase. Two definitions, behind a temporary switch until the
+  // listening round picks (design.md §6). Both leave the phase as it is at Shape 0.
+  //   A: the shaped wave becomes the phase. The plain cosine x = −cos 2πφ is shaped, and the result
+  //      is read back as the phase a plain cosine would need to make it (acos), so the warp then reads
+  //      the shaped wave's own phase. At Warp 0 this gives exactly Warp → Shape.
+  //      (Taken literally, u = ½(S(cos 2πφ) + 1) is not the plain phase even at Shape 0: it reads a
+  //      cosine of a cosine.)
+  //   B: the shaper bends the phase ramp: u = ½(S(2φ − 1) + 1), two phase warps in a row.
+  const ORDERS = ['Warp→Shape', 'Shape→Warp', 'Morph'];
+  function prePhase(sh, ph, s, def) {
+    if (def === 1) return clamp(0.5 * (shapeSample(sh, 2 * ph - 1, s) + 1), 0, 1);
+    const y = clamp(shapeSample(sh, -Math.cos(TWO_PI * ph), s), -1, 1), th = Math.acos(-y) / TWO_PI;
+    return ph < 0.5 ? th : 1 - th;
+  }
+  // a line's wave at phase φ, with the shaper first when pre.s > 0 (the window always follows time)
+  function waveAt(w, win, ph, p, k, pre) {
+    const u = pre && pre.s > 0 ? prePhase(pre.sh, ph, pre.s, pre.def) : ph;
+    return 2 * carrier(warpU(w, u, p, k)) * windowW(win, ph) - 1;
+  }
+  // how much a shaper on the phase steepens it: as after the warp, except Chebyshev, which multiplies
+  // the phase by its highest harmonic K (A) or steepens the ramp's ends by K² (B)
+  function expansionPre(sh, s, def) {
+    if (s <= 0) return 1;
+    if (sh.fam !== 0) return expansion(sh, s);
+    const c = chebNow(sh, s);
+    let K = 1;
+    for (let k = NH; k >= 2; k--) if (Math.abs(c[k]) > 0.01) { K = k; break; }
+    return def === 1 ? K * K : K;
+  }
+
   // mean, RMS and peak (DC removed) of a line's wave over one cycle (both cycles of a wave pair).
   // The cycle is cut at the warp's breakpoints and each piece gets the same number of points, so
   // a narrow pulse is measured as well as a wide one.
   const lvl = { mean: 0, rms: 1, peak: 1 };
   const cuts = new Float64Array(8);
-  function levelOf(w0, w1, win, p, k, sh, sv) {
+  function levelOf(w0, w1, win, p, k, sh, sv, pre) {
     let nc = 0;
     for (const c of [0, p, 2 * p, 0.5, 0.5 + p, 1]) if (c <= 1) cuts[nc++] = c;
     cuts.subarray(0, nc).sort();
@@ -547,7 +578,7 @@
         const a = cuts[j - 1], len = cuts[j] - a;
         if (len <= 0) continue;
         for (let i = 0; i < LEVEL_PTS; i++) {
-          let x = waveSample(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k);
+          let x = waveAt(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k, pre);
           if (sh) x = shapeSample(sh, x, sv);
           m += x * len; s += x * x * len;
           if (x > hi) hi = x; if (x < lo) lo = x;
@@ -564,7 +595,7 @@
 
   const core = {
     levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX,
-    maxSlope, SLOPE, WARP_FMAX, bezierAt, bezierSlope, FAMILIES, warpFamily, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
+    maxSlope, SLOPE, WARP_FMAX, ORDERS, prePhase, waveAt, expansionPre, bezierAt, bezierSlope, FAMILIES, warpFamily, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
     SHAPERS, FOLDS, SATS, NH, CURVE_N, makeShaper, shapeSample, chebWeights, morphCurves, curveTable, antiderivative,
     tableAt, antiAt, lockhart, analogFold, lambertWexp, DEFAULT_CURVES,
   };
@@ -616,6 +647,10 @@
     { id: 'sat1', def: 0, min: 0, max: 2, step: 1 },             // SATS
     { id: 'keys1', def: 4, min: 2, max: MAX_KEYS, step: 1 },     // drawn keyframes in use
     { id: 'morph1', def: 0, min: 0, max: 1 },                    // through the drawn keyframes
+    { id: 'order1', def: 0, min: 0, max: 2, step: 1 },           // ORDERS
+    { id: 'ordermorph1', def: 0, min: 0, max: 1 },               // Morph: 0 Warp→Shape … 1 Shape→Warp
+    { id: 'swdef1', def: 0, min: 0, max: 1, step: 1 },           // TEMPORARY (bench only): Shape→Warp definition A, B
+    { id: 'morphway1', def: 0, min: 0, max: 1, step: 1 },        // TEMPORARY (bench only): Morph through the warp, shared
     { id: 'shapekey1', def: 0.3, min: 0, max: 1 },               // key follow: less shape above middle C
     { id: 'senvdepth1', def: 0, min: -1, max: 1 },
     { id: 'link1', def: 0, min: -1, max: 1 },                    // the Warp envelope also drives Shape
@@ -721,6 +756,8 @@
       this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
       this.wp = 0.5; this.wk = 1;                      // pivot and resonance ratio, from warpPoint()
       this.wo = { w: 0, p: 0.5, k: 1 };               // an out-of-bounds family's values
+      this.pre = { sh: this.sh, s: 0, def: 0 };       // the shaper on the phase (order), for waveAt
+      this.sPost = 0;                                  // Shape after the warp, from orderSplit()
       this.k = {};          // per-block settings, filled by settings()
     }
     // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
@@ -756,6 +793,9 @@
       k.va = (1 - P[PINDEX.velamp1] * vl) * LEVEL;
       k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
       k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
+      k.order = Math.round(P[PINDEX.order1]); k.tm = P[PINDEX.ordermorph1];
+      k.def = Math.round(P[PINDEX.swdef1]); k.way = Math.round(P[PINDEX.morphway1]);
+      this.pre.def = k.def;
       const pr = Math.round(P[PINDEX.pair1]);
       k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);
       k.fam = Math.round(P[PINDEX.wfamily1]);
@@ -799,19 +839,44 @@
       this.wk = Math.max(1, Math.min(Math.pow(RESO_MAX, a), k.kHost, k.kOS / E));
       this.sh.fpk = k.fr * Math.max(maxSlope(k.w0, this.wp, this.wk), maxSlope(k.w1, this.wp, this.wk));
     }
+    // Shape s shared between the shaper on the phase (pre.s) and after the warp (sPost), by order.
+    // Morph through the warp: the shaper leaves the output (0 → ½) and enters the phase (½ → 1), so the
+    // middle is the warp alone. Morph shared: Shape is split between the two all the way.
+    // Returns how much the two together steepen the wave (for the pitch cap).
+    orderSplit(s) {
+      const k = this.k, sh = this.sh;
+      let a = 0, b = s;
+      if (k.order === 1) { a = s; b = 0; }
+      else if (k.order === 2) {
+        const t = k.tm;
+        if (k.way === 0) { a = s * Math.max(0, 2 * t - 1); b = s * Math.max(0, 1 - 2 * t); }
+        else { a = s * t; b = s * (1 - t); }
+      }
+      // the shaper on the phase steepens the phase itself: hold it under the pitch cap on its own
+      // (Chebyshev harmonic 16 on the ramp steepens it 256 times: −32 dB of aliasing at MIDI 48)
+      let ep = expansionPre(sh, a, k.def);
+      const lim = Math.max(1, WARP_FMAX / k.fr);
+      if (ep > lim) {
+        let lo = 0, hi = a;
+        for (let i = 0; i < 12; i++) { const m = 0.5 * (lo + hi); if (expansionPre(sh, m, k.def) > lim) hi = m; else lo = m; }
+        a = lo; ep = expansionPre(sh, a, k.def);
+      }
+      this.pre.s = a; this.sPost = b;
+      return ep * expansion(sh, b);
+    }
     warpAt(we) { const k = this.k, a = clamp(k.wbase + k.wdepth * we, 0, 1) * k.vw; return a; }
     shapeAt(we, se) { const k = this.k; return clamp(k.sbase + k.sdepth * se + k.link * we, 0, 1) * k.vs; }
     // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on,
     // and the level at the wave's own
     primeDc() {
       const k = this.settings(), s0 = this.shapeAt(0, 0);
-      this.warpPoint(this.warpAt(0), expansion(this.sh, s0));
+      this.warpPoint(this.warpAt(0), this.orderSplit(s0));
       const p = this.wp, kr = this.wk;
-      const l = levelOf(k.w0, k.w1, k.win, p, kr, this.sh, s0);
+      const l = levelOf(k.w0, k.w1, k.win, p, kr, this.sh, this.sPost, this.pre);
       this.dcx = l.mean; this.dcy = 0; this.gain = levelGain(l);
       // the band-limiting pipeline starts at the wave's first value, with nothing pending
-      this.x1 = waveSample(k.w0, k.win, 0, p, kr);
-      this.q0 = shapeSample(this.sh, this.x1, s0); this.carry = 0;
+      this.x1 = waveAt(k.w0, k.win, 0, p, kr, this.pre);
+      this.q0 = shapeSample(this.sh, this.x1, this.sPost); this.carry = 0;
     }
     // one piece of a split sample: ADAA from xa to the wave just before phase b0 on wave wa, over a
     // share dt of the sample; then the shaped jump and kink at the breakpoint (tb into the sample),
@@ -819,11 +884,12 @@
     // phase b1 on wave wb (the next piece's start).
     piece(xa, wa, b0, wb, b1, dt, tb, p, kr, s, inc) {
       const win = this.k.win, sh = this.sh, e = 1e-12, d = 1e-3 * inc;
-      const xb = waveSample(wa, win, b0 - e, p, kr), xc = waveSample(wb, win, b1 + e, p, kr);
+      const pre = this.pre;
+      const xb = waveAt(wa, win, b0 - e, p, kr, pre), xc = waveAt(wb, win, b1 + e, p, kr, pre);
       this.acc += dt * shapeADAA(sh, xa, xb, s);
       const ya = shapeSample(sh, xb, s), yb = shapeSample(sh, xc, s);
-      const sa = (ya - shapeSample(sh, waveSample(wa, win, b0 - e - d, p, kr), s)) * 1e3;
-      const sb = (shapeSample(sh, waveSample(wb, win, b1 + e + d, p, kr), s) - yb) * 1e3;
+      const sa = (ya - shapeSample(sh, waveAt(wa, win, b0 - e - d, p, kr, pre), s)) * 1e3;
+      const sb = (shapeSample(sh, waveAt(wb, win, b1 + e + d, p, kr, pre), s) - yb) * 1e3;
       const r = residuals(tb, yb - ya, sb - sa);
       this.rm += r.m; this.ro += r.o; this.rp += r.p;
       return xc;
@@ -843,8 +909,9 @@
       const R = e.dcR;
       // level: measured at the Warp and Shape the block starts with, moved to across the block
       const sb0 = this.shapeAt(this.wenv.v, this.senv.v);
-      this.warpPoint(this.warpAt(this.wenv.v), expansion(sh, sb0));
-      const g1 = levelGain(levelOf(w0, w1, win, this.wp, this.wk, sh, sb0));
+      this.warpPoint(this.warpAt(this.wenv.v), this.orderSplit(sb0));
+      const g1 = levelGain(levelOf(w0, w1, win, this.wp, this.wk, sh, this.sPost, this.pre));
+      const pre = this.pre;
       let g = this.gain;
       const dg = (g1 - g) / n;
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
@@ -855,9 +922,10 @@
         k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
         const we = wenv.next(), se = senv.next(), ae = aenv.next();
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
-        const s = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
+        const sAll = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
         // the pivot, resonance ratio and band limit only change when Warp, Shape or the pitch does
-        if (a !== wa || s !== ws || dfr !== 0) { this.warpPoint(a, expansion(sh, s)); wa = a; ws = s; }
+        if (a !== wa || sAll !== ws || dfr !== 0) { this.warpPoint(a, this.orderSplit(sAll)); wa = a; ws = sAll; }
+        const s = this.sPost;
         const p = this.wp, kr = this.wk;
         // advance the phase; the new sample x0 is the naive wave
         const prev = ph, wPrev = odd ? w1 : w0;
@@ -865,7 +933,7 @@
         let wrapped = false;
         if (ph >= 1) { ph -= 1; odd ^= 1; wrapped = true; }
         const w = odd ? w1 : w0;
-        const x0 = 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
+        const x0 = pre.s > 0 ? waveAt(w, win, ph, p, kr, pre) : 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
         // band limit: the shaped wave averaged over the sample (first-order ADAA, a box filter). Where the
         // wave jumps or kinks inside the sample, the sample is split there and each piece is averaged on
         // its own, so a jump goes through the shaper as the jump it is, not as a line through the values
@@ -874,9 +942,12 @@
         // Resonance at the end of the cycle (hard sync), and a window at ½ and at the end of the cycle.
         // (Splitting where the wave is smooth made the steep peaks alias more: −32 instead of −66 dB.)
         const B = this.bps;
-        B[0] = k.splitP || k.splitD ? p : 2; B[1] = k.splitHalf ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
+        // (Shape → Warp A picks the other branch of acos at ½, so the phase can jump there too)
+        B[0] = k.splitP || k.splitD ? p : 2; B[1] = k.splitHalf || (pre.s > 0 && pre.def === 0) ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
         const end = wrapped ? 1 : ph;
-        let split = wrapped && k.splitEnd;
+        // with the shaper on the phase, the wave may also jump at the end of the cycle
+        const splitEnd = k.splitEnd || pre.s > 0;
+        let split = wrapped && splitEnd;
         for (let j = 0; j < 3; j++) if (B[j] < 1 && B[j] > prev && B[j] <= end) { split = true; break; }
         let cur;
         this.rm = 0; this.ro = 0; this.rp = 0;
@@ -890,7 +961,7 @@
           }
           if (wrapped) {
             const t = (1 - prev) / inc;
-            if (k.splitEnd) { xa = this.piece(xa, wPrev, 1, w, 0, t - tp, t, p, kr, s, inc); tp = t; }
+            if (splitEnd) { xa = this.piece(xa, wPrev, 1, w, 0, t - tp, t, p, kr, s, inc); tp = t; }
             for (let j = 0; j < 3; j++) {
               const b = B[j];
               if (b < 1 && b <= ph) { const t = (1 - prev + b) / inc; xa = this.piece(xa, w, b, w, b, t - tp, t, p, kr, s, inc); tp = t; }

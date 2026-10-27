@@ -570,5 +570,67 @@ const cosine = (ph) => -Math.cos(2 * Math.PI * ph);     // what Warp 0 gives (2c
   check('22. the Smooth curves into the Sine fold: below −60 dB up to MIDI 108', w < -60, w.toFixed(1) + ' dB at worst (' + at + ')');
 }
 
+/* ================= batch 07: order ================= */
+
+/* ---------- 23. order ---------- */
+{
+  const base = { ...PLAIN, wave1: 0, warp1: 0.6, sfamily1: 1, fold1: 1, shape1: 0.5 };
+  const same = (a, b) => { let d = 0; for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(a[i] - b[i])); return d; };
+  const r = (p) => render(0.4, (e) => { apply(e, { ...base, ...p }); e.noteOn(50, 100); }).L;
+  const ws = r({ order1: 0 }), swA = r({ order1: 1, swdef1: 0 }), swB = r({ order1: 1, swdef1: 1 });
+  let d = 0;
+  for (const way of [0, 1]) for (const def of [0, 1]) {
+    d = Math.max(d, same(r({ order1: 2, ordermorph1: 0, morphway1: way, swdef1: def }), ws));
+    d = Math.max(d, same(r({ order1: 2, ordermorph1: 1, morphway1: way, swdef1: def }), def ? swB : swA));
+  }
+  check('23. Morph 0 is Warp → Shape and Morph 1 is Shape → Warp, both ways, both definitions (bit for bit)', d === 0);
+  check('23. the two definitions of Shape → Warp differ', same(swA, swB) > 0.05);
+  const z = (p) => r({ ...p, shape1: 0 });
+  check('23. at Shape 0 every order is the plain warped wave (bit for bit)', same(z({ order1: 1, swdef1: 0 }), z({ order1: 0 })) === 0 && same(z({ order1: 1, swdef1: 1 }), z({ order1: 0 })) === 0 && same(z({ order1: 2, ordermorph1: 0.4 }), z({ order1: 0 })) === 0);
+  // definition A at Warp 0 is exactly Warp → Shape (the shaped wave read back as its own phase)
+  let worst = 0;
+  for (const [fam, sub, h] of [[1, 1], [0, 0, [0.3, 0.2, 1, 0, 0.5]], [2, 0], [3, 0]]) {
+    setShaper(fam, sub, 0, h || [1]); sh.fpk = 0.001;
+    for (let i = 0; i < 400; i++) {
+      const ph = (i + 0.5) / 400;
+      worst = Math.max(worst, Math.abs(core.waveAt(0, 0, ph, 0.5, 1, { sh, s: 0.8, def: 0 }) - core.shapeSample(sh, core.waveSample(0, 0, ph, 0.5, 1), 0.8)));
+    }
+  }
+  check('23. Shape → Warp A at Warp 0 is exactly Warp → Shape (to the cosine table\'s precision)', worst < 2e-4, 'worst ' + worst.toExponential(1));
+  // B keeps the phase in 0–1 whatever the shaper
+  let out = 0;
+  for (const [fam, sub] of [[1, 0], [1, 1], [1, 2], [2, 0], [3, 0], [0, 0]]) { setShaper(fam, sub, 0.4, [1, 0.5, 1]); for (let i = 0; i <= 200; i++) { const u = core.prePhase(sh, i / 200, 1, 1); if (!(u >= 0 && u <= 1)) out++; } }
+  check('23. Shape → Warp B keeps the phase within 0–1 for every shaper', out === 0);
+  // a Morph sweep has no clicks beyond the steepest step of its two ends
+  const maxStep = (x) => { let m = 0; for (let i = 1; i < x.length; i++) m = Math.max(m, Math.abs(x[i] - x[i - 1])); return m; };
+  let jr = 0, jn = '';
+  for (const way of [0, 1]) for (const def of [0, 1]) {
+    const sweep = render(2.2, (e) => { apply(e, { ...base, order1: 2, morphway1: way, swdef1: def }); e.noteOn(45, 100); },
+      { events: (e, i) => e.setParam('ordermorph1', Math.min(1, i / (2 * SR))) }).L;
+    const ends = Math.max(maxStep(steady(render(0.5, (e) => { apply(e, { ...base, order1: 0 }); e.noteOn(45, 100); }).L, 0.1, 0.5)),
+      maxStep(steady(render(0.5, (e) => { apply(e, { ...base, order1: 1, swdef1: def }); e.noteOn(45, 100); }).L, 0.1, 0.5)));
+    const q = maxStep(steady(sweep, 0.1, 2.1)) / ends;
+    if (q > jr) { jr = q; jn = (way ? 'shared' : 'through the warp') + ', ' + (def ? 'B' : 'A'); }
+  }
+  check('23. a Morph sweep has no step beyond 1.5 × the steepest of its two ends', jr < 1.5, jr.toFixed(2) + ' × at worst (' + jn + ')');
+  // levels hold across the orders
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const lv = [];
+  for (const [fam, sub] of [[1, 1], [1, 0], [2, 0], [0, 0]]) for (const o of [{ order1: 1, swdef1: 0 }, { order1: 1, swdef1: 1 }, { order1: 2, ordermorph1: 0.5, morphway1: 1 }])
+    lv.push(dB(rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.6, sfamily1: fam, fold1: sub, sat1: sub, shape1: 0.7, h1_1: 1, h3_1: 0.6, h5_1: 0.4, shapekey1: 0, velshape1: 0, ...o }); e.noteOn(48, 100); }).L, 0.2, 0.5)) / rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.6 }); e.noteOn(48, 100); }).L, 0.2, 0.5))));
+  check('23. every order within 4 dB of the plain wave', Math.min(...lv) > -4 && Math.max(...lv) < 4, Math.min(...lv).toFixed(1) + ' to +' + Math.max(...lv).toFixed(1) + ' dB');
+}
+
+/* ---------- 24. aliasing of the orders ---------- */
+{
+  const { measure } = require(path.join(__dirname, '..', 'tools', 'alias.js'));
+  const H = Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1 / (i + 1)]));
+  let w = -Infinity, at = '';
+  for (const [on, o] of [['S→W A', { order1: 1, swdef1: 0 }], ['S→W B', { order1: 1, swdef1: 1 }], ['Morph ½ shared A', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 0 }], ['Morph ½ shared B', { order1: 2, ordermorph1: 0.5, morphway1: 1, swdef1: 1 }]])
+    for (const [sn, sp] of [['Sine fold', { sfamily1: 1, fold1: 1, shape1: 0.5 }], ['Chebyshev', { sfamily1: 0, shape1: 1, ...H }], ['Tanh', { sfamily1: 2, sat1: 0, shape1: 0.7 }]])
+      for (const m of [48, 72]) { const v = measure({ wave1: 0, warp1: 1, ...o, ...sp }, m); if (v > w) { w = v; at = on + ' · ' + sn + ' · MIDI ' + m; } }
+  check('24. the orders on a fully warped Saw up to MIDI 72: aliasing below −40 dB', w < -40, w.toFixed(1) + ' dB at worst (' + at + ')');
+}
+
 console.log('\n' + (count - failed) + ' of ' + count + ' tests passed');
 process.exit(failed ? 1 : 0);

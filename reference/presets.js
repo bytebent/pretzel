@@ -217,6 +217,32 @@
       phrase: [[40, 0, 1.6], [47, 1.8, 1.6], [40, 3.6, 1.6], [47, 5.4, 1.6]],
       steps: [{ time: 3.55, params: { window1: 2 } }],
     },
+
+    // ---------- batch 07: order (A/B and the two Morph ways are temporary switches) ----------
+    ...[[0, 'A', 'the shaped wave read back as a phase'], [1, 'B', 'the shaper bending the phase ramp']].map(([def, n, how]) => ({
+      name: 'Inside Out (' + n + ')',
+      design: true,
+      about: 'Shape → Warp, definition ' + n + ' (' + how + '): a warped Saw with the Sine fold on its phase. The Shape envelope opens on each note. Compare with the other letter.',
+      params: {
+        wave1: 0, warp1: 0.6, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.1, senvdepth1: 0.8, shapekey1: 0, velshape1: 0,
+        order1: 1, swdef1: def,
+        ...env('senv', 1, [[0.6, 1], [1.2, 0.3]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [1.5, 0.85], [0.3, 0]], 2, 3),
+      },
+      phrase: [[45, 0, 1.6], [52, 1.8, 1.6], [40, 3.6, 2.2]],
+    })),
+    ...[[0, 'through the warp', 'the fold leaves the output, the warp plays alone at the middle, then the fold enters the phase'], [1, 'shared', 'Shape is shared between the output and the phase all the way']].map(([way, n, how]) => ({
+      name: 'Turning (' + n + ')',
+      design: true,
+      about: 'A warped Saw with the Sine fold, Morph moving 0 → 1 → 0 (' + how + '). Definition B. An LFO will do this from batch 09; here a sweep stands in.',
+      params: {
+        wave1: 0, warp1: 0.65, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0,
+        order1: 2, ordermorph1: 0, morphway1: way, swdef1: 1, volume: -9,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[43, 0, 6.2], [50, 0, 6.2]],
+      sweeps: [{ id: 'ordermorph1', from: 0, to: 1, start: 0.3, end: 3.1 }, { id: 'ordermorph1', from: 1, to: 0, start: 3.1, end: 5.9 }],
+    })),
   ];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };

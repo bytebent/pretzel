@@ -4,7 +4,39 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 98 engine tests passing** (about 20 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+**Now: 106 engine tests passing** (about 30 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 07 · order
+
+Warp → Shape, Shape → Warp (definitions A and B) and Morph (through the warp, or shared), with A/B
+and the Morph way on temporary switches.
+
+![One cycle of a warped Saw through three shapers, in each order](docs/tests/07-orders.png)
+
+- **The design's definition A was not neutral.** u = ½(S(cos 2πφ) + 1) reads a cosine of a cosine
+  even at Shape 0. A now reads the shaped wave back as the phase a plain cosine would need (acos):
+  at Shape 0 it is the plain phase, and at Warp 0 it is exactly Warp → Shape (to the cosine table's
+  precision, 9e−5).
+- **Morph 0 and 1 are the two orders bit for bit**, both ways and both definitions; at Shape 0
+  every order is the plain warped wave bit for bit. Presets 01–19 are bit-identical to batch 06.
+- **A jumps where its two branches meet.** In the first plot, Morph ½ shared (A) jumped at the
+  middle of the cycle: when the shaped wave's peak is below 1, the two acos branches don't meet.
+  The sample is now split at ½ (and at the end of the cycle for both A and B).
+- **No clicks:** a Morph sweep never steps more than 1.46 × the steepest step of its two ends.
+- **Levels** across the orders: −1.2 to +0.3 dB from the plain wave.
+- **The shaper on the phase needs its own pitch cap.** Chebyshev (16 harmonics) on the phase ramp
+  (B) steepened it 256 times and aliased at −32 dB at MIDI 48. Its share of Shape is now held under
+  the cap (−42 dB at worst in the test set).
+- **Aliasing** (`docs/tests/07-alias-orders.txt`: 4 orders × 6 shapers × 5 waves × MIDI 24–108 at
+  Warp 1): 447 of 600 below −60 dB. Medians: A −77, B −79, shared Morph −78 (A) and −81 (B) dB. The
+  worst (−27 to −40 dB) are folds on the phase, the Triangle fold most, with Vector, Sync or windowed
+  Resonance from MIDI 48 up: the fold's creases and the acos turn the phase sharply where nothing
+  smooths it. B aliases less than A.
+
+![Spectrograms: Inside Out A and B, Turning both ways](docs/tests/07-spectrograms.png)
+
+Renders: Inside Out (A) and (B), Turning (through the warp) and (shared), for choosing. Turning
+sweeps Morph with a programmed sweep until the LFOs arrive in batch 09.
 
 ## Batch 06 · out-of-bounds warps
 
