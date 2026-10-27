@@ -35,6 +35,12 @@ and the Morph way on temporary switches.
 
 ![Spectrograms: Inside Out A and B, Turning both ways](docs/tests/07-spectrograms.png)
 
+**Cost.** The shaper on the phase costs a second shaper per sample (and, for A, an arccosine and a
+cosine): 8 voices of Shape → Warp A with Shape moving take 6.2% per voice here, the shared Morph
+(both shapers at once) 8.2%, against 4.1–4.7% for the dearest single shaper. The shared Morph is now
+the benchmark's worst case: a full voice in JavaScript is projected at 21% per voice, 171% for 8.
+The C++ port decides whether that matters (batch 11).
+
 Renders: Inside Out (A) and (B), Turning (through the warp) and (shared), for choosing. Turning
 sweeps Morph with a programmed sweep until the LFOs arrive in batch 09.
 
