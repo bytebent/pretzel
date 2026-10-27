@@ -51,10 +51,10 @@ function run(params, notes, move) {
 }
 
 const rows = [];
-for (const [name, p, notes, move] of SCENARIOS) rows.push([name, Math.min(run(p, notes, move), run(p, notes, move)), notes.length]);
+for (const [name, p, notes, move] of SCENARIOS) rows.push([name, Math.min(run(p, notes, move), run(p, notes, move), run(p, notes, move)), notes.length]);
 const w = Math.max(...rows.map((r) => r[0].length));
 const out = [];
-out.push('pretzel reference engine · ' + SR / 1000 + ' kHz · ' + SECS + ' s per run · best of two · Node ' + process.version);
+out.push('pretzel reference engine · ' + SR / 1000 + ' kHz · ' + SECS + ' s per run · best of three · Node ' + process.version);
 out.push('Scenario'.padEnd(w) + '   CPU   per voice');
 const silent = rows[0][1];
 for (const [name, f, n] of rows) out.push(name.padEnd(w) + '  ' + (f * 100).toFixed(1).padStart(5) + '%' + (n ? ((f - silent) / n * 100).toFixed(1).padStart(9) + '%' : ''));

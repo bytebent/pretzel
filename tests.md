@@ -35,6 +35,10 @@ pure cosine and the knobs say where Warp 1 goes.
 
 ![Spectrograms: Vowel, Vector bass, Smooth tour, Sync sweep](docs/tests/06-spectrograms.png)
 
+**Mac run:** 98 tests pass. The benchmark came out up to 2× slower than batch 05's runs (8 voices
+of plain Saw: 31.7% against 15.6–21.3%), but the batch 05 and 06 engines measure the same here
+(16.4% and 16.6%): the shared runner's noise. The benchmark now takes the best of three runs.
+
 Renders: the design preset Vowel (with Vector x swept: the mod wheel comes in batch 09), plus
 Vector bass, Smooth tour and Sync sweep. Presets 01–15 are bit-identical to batch 05.
 
