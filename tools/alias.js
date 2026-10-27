@@ -38,6 +38,7 @@ for (let i = 0; i < N; i++) { const a = 2 * Math.PI * i / (N - 1); WIN[i] = 0.35
 
 // a steady note with these settings: flat amp, no envelopes, no velocity or key effects
 const STEADY = {
+  lines: 0,
   velwarp1: 0, velamp1: 0, velshape1: 0, warpkey1: 0, shapekey1: 0, wenvdepth1: 0, senvdepth1: 0, link1: 0,
   aenv1t1: 0.002, aenv1l1: 1, aenv1t2: 0.01, aenv1l2: 1, aenv1sus: 2, aenv1end: 3,
 };

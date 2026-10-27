@@ -178,13 +178,14 @@
     {
       name: 'Vowel',
       design: true,
-      about: 'Vector at Warp 1 with v = 2.5: the first part of each cycle reads 2.5 cycles, a formant. d sweeps from 0.1 to 0.9 and back, moving the formant like a vowel. (The design puts d on the mod wheel; that comes in batch 09, so a sweep stands in.)',
+      about: 'Vector at Warp 1 with v = 2.5: the first part of each cycle reads 2.5 cycles, a formant. The mod wheel moves d from 0.1 to 0.9 and back, moving the formant like a vowel.',
       params: {
         wfamily1: 1, vecx1: 0.1, vecy1: 2.5, warp1: 1, wenvdepth1: 0, warpkey1: 0, velwarp1: 0, volume: -12,
+        wheeldest: 14, wheeldepth: 0.8,
         ...env('aenv', 1, [[0.15, 1], [6, 0.9], [0.6, 0]], 2, 3),
       },
       phrase: [...chord([45, 52, 57, 60], 0, 6.2, 90)],
-      sweeps: [{ id: 'vecx1', from: 0.1, to: 0.9, start: 0.2, end: 3.2 }, { id: 'vecx1', from: 0.9, to: 0.1, start: 3.2, end: 6.0 }],
+      sweeps: [{ id: 'wheel', from: 0, to: 1, start: 0.2, end: 3.2 }, { id: 'wheel', from: 1, to: 0, start: 3.2, end: 6.0 }],
     },
     {
       name: 'Vector bass',
@@ -234,14 +235,14 @@
     ...[[0, 'through the warp', 'the fold leaves the output, the warp plays alone at the middle, then the fold enters the phase'], [1, 'shared', 'Shape is shared between the output and the phase all the way']].map(([way, n, how]) => ({
       name: 'Turning (' + n + ')',
       design: true,
-      about: 'A warped Saw with the Sine fold, Morph moving 0 → 1 → 0 (' + how + '). Definition B. An LFO will do this from batch 09; here a sweep stands in.',
+      about: 'A warped Saw with the Sine fold, a slow triangle LFO moving Morph 0 → 1 → 0 (' + how + '). Shape → Warp: Bend.',
       params: {
         wave1: 0, warp1: 0.65, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0,
-        order1: 2, ordermorph1: 0, morphway1: way, swmode1: 1, volume: -9,
+        order1: 2, ordermorph1: 0.5, morphway1: way, swmode1: 1, volume: -9,
+        lfo1shape: 1, lfo1rate: 1 / 5.6, lfo1dest1: 38, lfo1depth1: 0.5,
         ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
       },
       phrase: [[43, 0, 6.2], [50, 0, 6.2]],
-      sweeps: [{ id: 'ordermorph1', from: 0, to: 1, start: 0.3, end: 3.1 }, { id: 'ordermorph1', from: 1, to: 0, start: 3.1, end: 5.9 }],
     })),
 
     // ---------- batch 08: Twist ----------
@@ -283,7 +284,87 @@
       phrase: [[33, 0, 5.5]],
       sweeps: [{ id: 'twist1', from: 0.4, to: 1, start: 0.5, end: 5.0 }],
     },
+
+    // ---------- batch 09: two lines and modulation ----------
+    {
+      name: 'CZ Duo',
+      batch: 9,
+      about: 'Lines 1+2: a Saw with a brassy Warp envelope, and Resonance through the Triangle window an octave up, 7 cents sharp, with a slower envelope of its own.',
+      params: {
+        lines: 3, volume: -12,
+        wave1: 0, warp1: 0, velwarp1: 0.4, ...env('wenv', 1, [[0.07, 0.8], [0.5, 0.5], [0.25, 0]], 2, 3), ...env('aenv', 1, [[0.03, 1], [0.6, 0.85], [0.25, 0]], 2, 3),
+        wave2: 5, window2: 2, octave2: 1, detune2: 7, warp2: 0, warpkey2: 0.2, ...env('wenv', 2, [[0.6, 0.9], [0.8, 0.4], [0.4, 0]], 2, 3), ...env('aenv', 2, [[0.15, 1], [0.8, 0.7], [0.4, 0]], 2, 3), level2: -4,
+      },
+      phrase: [...chord([48, 55, 60, 64], 0, 0.9, 110), ...chord([50, 57, 62, 65], 1.0, 0.9, 95), ...chord([53, 57, 60, 69], 2.0, 1.6, 110)],
+    },
+    {
+      name: '1+1′ chorus',
+      batch: 9,
+      about: 'Lines 1+1′: line 1 played twice, the copy 9 cents sharp, a Square into a little Tanh. The CZ\'s own chorus.',
+      params: {
+        lines: 2, detune2: 9, volume: -12,
+        wave1: 1, warp1: 0.35, wenvdepth1: 0.4, sfamily1: 2, shape1: 0.4, ...env('wenv', 1, [[0.2, 1], [1.0, 0.3]], 2, 3), ...env('aenv', 1, [[0.08, 1], [1.2, 0.9], [0.5, 0]], 2, 3),
+      },
+      phrase: [...chord([45, 52, 57, 64], 0, 1.4, 90), ...chord([43, 50, 55, 62], 1.6, 1.8, 90)],
+    },
+    {
+      name: 'Ring bell',
+      batch: 9,
+      about: 'Ring: line 2 (a cosine an octave and a fifth up, 8 cents flat) times line 1 (a cosine), with short, decaying envelopes: inharmonic, bell-like partials.',
+      params: {
+        lines: 3, ring: 1, volume: -6,
+        warp1: 0, wenvdepth1: 0, ...env('aenv', 1, [[0.002, 1], [2.5, 0]], 0, 2), velamp1: 0.3,
+        warp2: 0.3, wenvdepth2: 0, octave2: 1, fifth2: 1, detune2: -8, ...env('aenv', 2, [[0.002, 1], [1.2, 0]], 0, 2), velamp2: 0.3,
+      },
+      phrase: [[72, 0, 2.0], [79, 0.5, 2.0], [76, 1.0, 2.0], [84, 1.5, 2.5]],
+    },
+    {
+      name: 'Noise hit',
+      batch: 9,
+      about: 'A drum from the CZ trick: line 1 a cosine whose pitch envelope drops two octaves in 60 ms (the body), line 2 with Noise on its pitch and a short envelope (the snare).',
+      params: {
+        lines: 3, noise: 1, volume: -6,
+        warp1: 0, wenvdepth1: 0, penvdepth1: 24, ...env('penv', 1, [[0.001, 1], [0.06, 0]], 0, 2), ...env('aenv', 1, [[0.001, 1], [0.25, 0]], 0, 2),
+        wave2: 0, warp2: 0.8, wenvdepth2: 0, ...env('aenv', 2, [[0.001, 1], [0.12, 0]], 0, 2), level2: -3,
+      },
+      phrase: [0, 0.5, 1.0, 1.25, 1.5, 2.0].map((t, i) => [i === 3 ? 43 : 40, t, 0.2, i === 3 ? 80 : 115]),
+    },
+    {
+      name: 'Pitch drop bass',
+      batch: 9,
+      about: 'Line 1 alone: each note starts an octave up and drops in 80 ms, a Saw into the Sine fold with the fold following the drop.',
+      params: {
+        lines: 0, wave1: 0, warp1: 0.5, wenvdepth1: 0, sfamily1: 1, fold1: 1, shape1: 0.2, senvdepth1: 0.5, shapekey1: 0,
+        penvdepth1: 12, ...env('penv', 1, [[0.001, 1], [0.08, 0]], 0, 2), ...env('senv', 1, [[0.001, 1], [0.2, 0.2]], 2, 3), ...env('aenv', 1, [[0.002, 1], [0.4, 0.7], [0.1, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 0.35], [33, 0.5, 0.2], [36, 0.75, 0.35], [31, 1.25, 0.6]],
+    },
+    {
+      name: 'LFO wobble',
+      batch: 9,
+      about: 'Line 1 alone: a Saw into Tanh, LFO 1 (a sine, ⅛ notes at 120 BPM) on Shape, LFO 2 (random, ¼ notes) on Warp.',
+      params: {
+        lines: 0, wave1: 0, warp1: 0.4, wenvdepth1: 0, sfamily1: 2, sat1: 0, shape1: 0.45, shapekey1: 0,
+        lfo1shape: 0, lfo1sync: 1, lfo1div: 3, lfo1dest1: 23, lfo1depth1: 0.45,
+        lfo2shape: 4, lfo2sync: 1, lfo2div: 5, lfo2dest1: 11, lfo2depth1: 0.3,
+        ...env('aenv', 1, [[0.01, 1], [3, 1], [0.3, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 1.9], [43, 2.0, 1.9]],
+    },
+    {
+      name: 'Twist envelope',
+      batch: 9,
+      about: 'Line 1 alone: a cosine with mod envelope 1 on Twist: each note starts as a saw and relaxes to a pure tone in half a second.',
+      params: {
+        lines: 0, warp1: 0, wenvdepth1: 0, menv1dest1: 41, menv1depth1: 0.6, ...env('menv', 1, [[0.002, 1], [0.5, 0]], 0, 2),
+        ...env('aenv', 1, [[0.005, 1], [0.8, 0.8], [0.3, 0]], 2, 3),
+      },
+      phrase: [[48, 0, 0.7], [55, 0.8, 0.7], [52, 1.6, 0.7], [60, 2.4, 1.2]],
+    },
   ];
+
+  // presets made before the second line (batches 02–08) play line 1 alone, as they were made
+  PRESETS.forEach((pr) => { if (!pr.batch && pr.params.lines === undefined) pr.params = { lines: 0, ...pr.params }; });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };
   else root.PretzelPresets = PRESETS;

@@ -9,7 +9,8 @@ const { PretzelEngine } = require(path.join(__dirname, '..', 'reference', 'pretz
 const SR = 48000, SECS = +process.argv[2] || 3, BL = 128;
 const H16 = Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1 / (i + 1)]));
 // a held note at full level, envelopes parked at their sustain
-const HELD = { aenv1t1: 0.005, aenv1l1: 1, aenv1t2: 0.01, aenv1l2: 1, aenv1sus: 2, aenv1end: 3, wenvdepth1: 0, senvdepth1: 0, velamp1: 0 };
+const HELD = { lines: 0, aenv1t1: 0.005, aenv1l1: 1, aenv1t2: 0.01, aenv1l2: 1, aenv1sus: 2, aenv1end: 3, wenvdepth1: 0, senvdepth1: 0, velamp1: 0 };
+const HELD2 = { aenv2t1: 0.005, aenv2l1: 1, aenv2t2: 0.01, aenv2l2: 1, aenv2sus: 2, aenv2end: 3, wenvdepth2: 0, senvdepth2: 0, velamp2: 0 };
 const chord8 = [48, 55, 60, 64, 67, 71, 74, 79];
 const high8 = chord8.map((n) => n + 24);
 // "moving" scenarios sweep Warp, Shape and Morph like an LFO, so nothing settles
@@ -36,6 +37,11 @@ const SCENARIOS = [
   ['8 voices, Shape → Warp A, Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, order1: 1, swmode1: 0 }, chord8, MOVE],
   ['8 voices, Morph shared (both shapers), Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, order1: 2, ordermorph1: 0.5, morphway1: 1 }, chord8, MOVE],
   ['8 voices, Twist 0.6, Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, twist1: 0.6 }, chord8, MOVE],
+  ['Full voice: 8 voices, lines 1+2, Morph shared, Twist 0.6, LFOs and mod envelopes', {
+    lines: 3, wave1: 0, sfamily1: 1, fold1: 1, order1: 2, ordermorph1: 0.5, morphway1: 1, twist1: 0.6,
+    wave2: 5, window2: 2, sfamily2: 2, shape2: 0.5, twist2: 0.6, warp2: 0.6, ...HELD2,
+    lfo1dest1: 10, lfo1depth1: 0.3, lfo1rate: 4, lfo2shape: 4, lfo2dest1: 22, lfo2depth1: 0.3, lfo2rate: 7,
+    menv1dest1: 40, menv1depth1: 0.3, menv2dest1: 37, menv2depth1: 0.3 }, chord8, MOVE],
   ['8 voices, Double pulse + window into Drawn, moving, high', { wave1: 6, pair1: 6, window1: 2, sfamily1: 3, keys1: 4 }, high8, MOVE],
 ];
 
@@ -61,12 +67,7 @@ out.push('pretzel reference engine · ' + SR / 1000 + ' kHz · ' + SECS + ' s pe
 out.push('Scenario'.padEnd(w) + '   CPU   per voice');
 const silent = rows[0][1];
 for (const [name, f, n] of rows) out.push(name.padEnd(w) + '  ' + (f * 100).toFixed(1).padStart(5) + '%' + (n ? ((f - silent) / n * 100).toFixed(1).padStart(9) + '%' : ''));
-// a full voice has two lines and Twist (batches 08–09): projected as two lines plus 30% for Twist,
-// from the most expensive 8-voice scenario
 const worst = rows.filter((r) => r[2] === 8).reduce((a, r) => (r[1] > a[1] ? r : a));
-const perLine = (worst[1] - silent) / worst[2];
 out.push('');
-out.push('Worst 8-voice case: ' + worst[0]);
-out.push('Projected full voice (two lines + Twist, 2 × line × 1.3): ' + (perLine * 2.6 * 100).toFixed(1) + '% per voice, ' +
-  ((silent + perLine * 2.6 * 8) * 100).toFixed(0) + '% of one core for 8 voices');
+out.push('Worst 8-voice case: ' + worst[0] + ' — ' + (worst[1] * 100).toFixed(0) + '% of one core');
 console.log(out.join('\n'));

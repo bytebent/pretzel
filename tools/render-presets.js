@@ -49,7 +49,10 @@ function renderPreset(pr) {
     // sweeps: [{ id, from, to, start, end }] move a parameter in a straight line between two times
     for (const sw of pr.sweeps || []) {
       const t = i / SR;
-      if (t >= sw.start - BL / SR && t <= sw.end + BL / SR) e.setParam(sw.id, sw.from + (sw.to - sw.from) * Math.min(1, Math.max(0, (t - sw.start) / (sw.end - sw.start))));
+      if (t >= sw.start - BL / SR && t <= sw.end + BL / SR) {
+        const v = sw.from + (sw.to - sw.from) * Math.min(1, Math.max(0, (t - sw.start) / (sw.end - sw.start)));
+        if (sw.id === 'wheel') e.setModWheel(v); else if (sw.id === 'aftertouch') e.setAftertouch(v); else e.setParam(sw.id, v);
+      }
     }
     const m = Math.min(BL, n - i);
     e.process(tl, tr, m);
@@ -62,7 +65,7 @@ if (require.main === module) {
   PRESETS.forEach((pr, idx) => {
     const { L, R, seconds, ms } = renderPreset(pr);
     let pk = 0; for (const v of L) pk = Math.max(pk, Math.abs(v));
-    const file = path.join(outDir, String(idx + 1).padStart(2, '0') + ' ' + pr.name.replace(/[^\w ()-]/g, '') + '.wav');
+    const file = path.join(outDir, String(idx + 1).padStart(2, '0') + ' ' + pr.name.replace(/[^\w ()+-]/g, '') + '.wav');
     fs.writeFileSync(file, wav24(L, R));
     console.log(path.basename(file).padEnd(34), 'peak', pk.toFixed(3), ' render', (ms / 1000 / seconds * 100).toFixed(1) + '% of real time');
   });

@@ -1,7 +1,7 @@
 // Reference engine tests. Run: node tests/engine-test.js
 'use strict';
 const path = require('path');
-const { PretzelEngine, PARAMS, core } = require(path.join(__dirname, '..', 'reference', 'pretzel-engine.js'));
+const { PretzelEngine, PARAMS, core, DEST_IDS } = require(path.join(__dirname, '..', 'reference', 'pretzel-engine.js'));
 const { env } = require(path.join(__dirname, '..', 'reference', 'presets.js'));
 
 let failed = 0, count = 0;
@@ -17,6 +17,7 @@ function render(seconds, setup, opts) {
   const e = new PretzelEngine(SR, 1234);
   const n = Math.round(SR * seconds);
   const L = new Float32Array(n), R = new Float32Array(n);
+  e.setParam('lines', 0);     // line 1 alone, unless a test asks for more
   setup(e);
   const bl = opts.block || 128;
   const tl = new Float32Array(bl), tr = new Float32Array(bl);
@@ -676,6 +677,92 @@ const cosine = (ph) => -Math.cos(2 * Math.PI * ph);     // what Warp 0 gives (2c
   const lv = (t) => rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.6, sfamily1: 1, fold1: 1, shape1: 0.5, twist1: t }); e.noteOn(48, 100); }).L, 0.2, 0.5));
   const l0 = lv(0), lt = [0.25, 0.5, 0.75, 1].map((t) => dB(lv(t) / l0));
   check('25. level within 3 dB across Twist', lt.every((v) => Math.abs(v) < 3), lt.map((v) => v.toFixed(1)).join(' / ') + ' dB');
+}
+
+/* ================= batch 09: two lines and modulation ================= */
+
+/* ---------- 26. two lines ---------- */
+{
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const base = { ...PLAIN, wave1: 0, warp1: 0.5, sfamily1: 1, fold1: 1, shape1: 0.3, volume: -18 };
+  // copy line 1's settings to line 2
+  const copy12 = {};
+  for (const d of PARAMS) { const m = /^(.*?)(_?)1$/.exec(d.id); if (m && PARAMS.some((q) => q.id === m[1] + m[2] + '2') && !/^(lfo|menv)/.test(d.id)) copy12[m[1] + m[2] + '2'] = d.id; }
+  const withCopy = (e, extra) => { apply(e, base); for (const id2 in copy12) e.setParam(id2, e.getParam(copy12[id2])); apply(e, extra); };
+  const one = render(0.5, (e) => { apply(e, base); e.noteOn(48, 100); }).L;
+  const dbl = render(0.5, (e) => { withCopy(e, {}); e.setParam('detune2', 0); e.setParam('lines', 2); e.noteOn(48, 100); }).L;
+  let d = 0, pk = 0; for (let i = 0; i < one.length; i++) { d = Math.max(d, Math.abs(dbl[i] - Math.SQRT2 * one[i])); pk = Math.max(pk, Math.abs(one[i])); }
+  check('26. 1+1′ with no detune is line 1 doubled (each line 3 dB down: √2 × line 1)', d < 1e-5 * pk, 'difference ' + (d / pk).toExponential(1) + ' of peak');
+  const two = render(0.5, (e) => { withCopy(e, {}); e.setParam('detune2', 0); e.setParam('lines', 1); e.noteOn(48, 100); }).L;
+  let d2 = 0; for (let i = 0; i < one.length; i++) d2 = Math.max(d2, Math.abs(two[i] - one[i]));
+  check('26. line 2 alone with line 1\'s settings is line 1 (bit for bit)', d2 === 0);
+  // pitch: octave and fifth on line 2
+  const p2 = (extra, lo, hi) => { const L = render(1.0, (e) => { withCopy(e, { lines: 1, detune2: 0, ...extra }); e.noteOn(57, 100); }).L; return pitch(steady(L, 0.3, 0.9), SR, lo, hi); };
+  const fo = p2({ octave2: 1 }, 350, 560), ff = p2({ fifth2: 1 }, 260, 420);
+  check('26. line 2 Octave +1 sounds an octave up', Math.abs(cents(fo, 440)) < 0.5, fo.toFixed(2) + ' Hz');
+  check('26. line 2 Fifth sounds 7 semitones up', Math.abs(cents(ff, 220 * Math.pow(2, 7 / 12))) < 0.5, ff.toFixed(2) + ' Hz');
+  // ring: line 1 at f and line 2 at a fifth, both pure cosines: the product's sum and difference appear
+  const amp = (x, f) => { let re = 0, im = 0; const N = x.length; for (let i = 0; i < N; i++) { const a = 2 * Math.PI * i / (N - 1), w = 2 * Math.PI * f * i / SR, h = 0.35875 - 0.48829 * Math.cos(a) + 0.14128 * Math.cos(2 * a) - 0.01168 * Math.cos(3 * a); re += x[i] * h * Math.cos(w); im += x[i] * h * Math.sin(w); } return Math.hypot(re, im); };
+  const sines = { ...PLAIN, warp1: 0, warp2: 0, lines: 3, fifth2: 1, detune2: 0, ...env('aenv', 2, [[0.005, 1], [0.01, 1], [0.01, 0]], 2, 3), velamp2: 0, wenvdepth2: 0 };
+  const rg = steady(render(1.2, (e) => { apply(e, { ...sines, ring: 1 }); e.noteOn(48, 100); }).L, 0.3, 1.2);
+  const f1 = 440 * Math.pow(2, (48 - 69) / 12), f2 = f1 * Math.pow(2, 7 / 12);
+  const lvl = (f) => dB(amp(rg, f) / amp(rg, f1));
+  check('26. Ring: line 2 times line 1 gives the sum and difference, and line 2\'s own pitch goes', lvl(f2 + f1) > -20 && lvl(f2 - f1) > -20 && lvl(f2) < -60, 'sum ' + lvl(f2 + f1).toFixed(0) + ', difference ' + lvl(f2 - f1).toFixed(0) + ', line 2 ' + lvl(f2).toFixed(0) + ' dB');
+  // noise: line 2 becomes noise, the same every time
+  const { aliasDb } = require(path.join(__dirname, '..', 'tools', 'alias.js'));
+  const nz = (blk) => render(1.8, (e) => { apply(e, { ...sines, lines: 1, noise: 1, wave2: 0, warp2: 0.6 }); e.noteOn(48, 100); }, { block: blk }).L;
+  const n1 = nz(128), n2 = nz(37);
+  let dn = 0; for (let i = 0; i < n1.length; i++) dn = Math.max(dn, Math.abs(n1[i] - n2[i]));
+  const nzDb = aliasDb(n1.subarray(Math.round(0.3 * SR), Math.round(0.3 * SR) + 65536), 440 * Math.pow(2, (48 - 69) / 12));
+  check('26. Noise: line 2 turns to noise (energy between the harmonics above −10 dB), the same at any buffer size', nzDb > -10 && dn === 0, nzDb.toFixed(1) + ' dB');
+  // pitch envelope: an octave up at the start, falling to the note
+  const pe = render(1.0, (e) => { apply(e, { ...PLAIN, penvdepth1: 12, ...env('penv', 1, [[0.001, 1], [0.4, 0]], 0, 2) }); e.noteOn(57, 100); }).L;
+  const early = pitch(steady(pe, 0.005, 0.03), SR, 330, 520), late = pitch(steady(pe, 0.5, 0.9), SR, 180, 260);
+  check('26. pitch envelope: starts near an octave up and falls to the note', early > 400 && Math.abs(cents(late, 220)) < 1, early.toFixed(0) + ' Hz → ' + late.toFixed(2) + ' Hz');
+  // 1+2: two different lines both sound, and the pair sits within 3 dB of one line
+  const duo = steady(render(0.6, (e) => { apply(e, { ...PLAIN, lines: 3, wave2: 5, window2: 2, warp2: 0.6, wenvdepth2: 0, detune2: 0, octave2: 1 }); e.noteOn(48, 100); }).L, 0.2, 0.6);
+  const solo = steady(render(0.6, (e) => { apply(e, { ...PLAIN }); e.noteOn(48, 100); }).L, 0.2, 0.6);
+  check('26. 1+2: both lines together within 3 dB of one line alone', Math.abs(dB(rms(duo) / rms(solo))) < 3, dB(rms(duo) / rms(solo)).toFixed(1) + ' dB');
+}
+
+/* ---------- 27. modulation ---------- */
+{
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const H3 = { h1_1: 1, h3_1: 0.5, h5_1: 0.3 };
+  // a setting where each destination matters
+  const where = {
+    pitch: {}, level: {}, detune: {}, warp: { warp1: 0.4 }, vecx: { wfamily1: 1, warp1: 1, vecy1: 2.5 }, vecy: { wfamily1: 1, warp1: 1 },
+    ratio: { wfamily1: 3, warp1: 1, ratio1: 5 }, shape: { sfamily1: 1, shape1: 0.4 }, bias: { sfamily1: 2, shape1: 0.6 },
+    tilt: { sfamily1: 0, shape1: 1, ...H3 }, oddeven: { sfamily1: 0, shape1: 1, ...H3, h2_1: 0.5 }, morph: { sfamily1: 3, shape1: 1, morph1: 0.4 },
+    ordermorph: { sfamily1: 1, shape1: 0.5, order1: 2, ordermorph1: 0.5, morphway1: 1 }, twist: { twist1: 0.3 },
+  };
+  const out = (p, m) => steady(render(0.8, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.3, ...p, ...m }); e.noteOn(48, 100); }).L, 0.2, 0.8);
+  const dead = [];
+  for (const [i, name] of DEST_IDS.entries()) {
+    const ref = out(where[name], {}), mod = out(where[name], { lfo1dest1: 1 + 3 * i + 1, lfo1depth1: 0.5, lfo1rate: 3 });
+    let d = 0; for (let j = 0; j < ref.length; j++) d = Math.max(d, Math.abs(mod[j] - ref[j]));
+    if (!(d > 0.01 * rms(ref))) dead.push(name);
+  }
+  check('27. every destination (' + DEST_IDS.length + ') moves the sound from an LFO', dead.length === 0, dead.length ? 'no effect: ' + dead.join(', ') : DEST_IDS.join(', '));
+  // the mod wheel and aftertouch, and a mod envelope on Twist
+  const wh = render(0.6, (e) => { apply(e, { ...PLAIN, ...where.shape, wheeldest: 1 + 3 * 7 + 1, wheeldepth: 1 }); e.setModWheel(1); e.noteOn(48, 100); }).L;
+  const at = render(0.6, (e) => { apply(e, { ...PLAIN, ...where.shape, atdest: 1 + 3 * 7 + 1, atdepth: 1 }); e.setAftertouch(1); e.noteOn(48, 100); }).L;
+  const plain = render(0.6, (e) => { apply(e, { ...PLAIN, ...where.shape }); e.noteOn(48, 100); }).L;
+  const me = render(0.6, (e) => { apply(e, { ...PLAIN, menv1dest1: 1 + 3 * 13 + 1, menv1depth1: 1, ...env('menv', 1, [[0.01, 1]], 1, 1) }); e.noteOn(48, 100); }).L;
+  const me0 = render(0.6, (e) => { apply(e, { ...PLAIN }); e.noteOn(48, 100); }).L;
+  const diff = (a, b) => { let d = 0; for (let j = 0; j < a.length; j++) d = Math.max(d, Math.abs(a[j] - b[j])); return d; };
+  check('27. mod wheel and aftertouch move their destination; a mod envelope drives Twist', diff(wh, plain) > 0.01 && diff(at, plain) > 0.01 && diff(me, me0) > 0.01);
+  // tempo sync: a square LFO on level at ¼ notes and 120 BPM switches every 0.25 s (2 Hz)
+  const sy = render(3.0, (e) => { apply(e, { ...PLAIN, lfo1shape: 3, lfo1sync: 1, lfo1div: 5, lfo1dest1: 1 + 3 * 1 + 1, lfo1depth1: -0.5 }); e.setTempo(120); e.noteOn(60, 100); }).L;
+  const envl = []; for (let t = 0.5; t < 2.9; t += 0.005) envl.push(rms(sy.subarray(Math.round(t * SR), Math.round((t + 0.005) * SR))));
+  const m = envl.reduce((a, b) => a + b) / envl.length, c = envl.map((v) => v - m);
+  let best = 0, lag = 0; for (let l = 40; l < 160; l++) { let s = 0; for (let j = 0; j + l < c.length; j++) s += c[j] * c[j + l]; if (s > best) { best = s; lag = l; } }
+  check('27. LFO synced to ¼ notes at 120 BPM repeats every 0.5 s', Math.abs(lag * 0.005 - 0.5) < 0.011, (lag * 0.005).toFixed(3) + ' s');
+  // same output at any buffer size, with every modulator running (random LFO, noise, envelopes)
+  const busy = (blk) => render(0.8, (e) => { apply(e, { lines: 3, noise: 1, lfo1shape: 4, lfo1rate: 9, lfo1dest1: 1 + 3 * 3, lfo1depth1: 0.4, lfo2dest1: 1, lfo2depth1: 0.2, menv1dest1: 1 + 3 * 7, menv1depth1: 0.5, sfamily1: 1 }); e.setModWheel(0.3); e.noteOn(48, 100); e.noteOn(55, 90); }, { block: blk }).L;
+  const b1 = busy(128), b2 = busy(37), b3 = busy(1);
+  let db = 0; for (let j = 0; j < b1.length; j++) db = Math.max(db, Math.abs(b1[j] - b2[j]), Math.abs(b1[j] - b3[j]));
+  check('27. with every modulator running, buffers of 128, 37 and 1 give the same output', db === 0);
 }
 
 console.log('\n' + (count - failed) + ' of ' + count + ' tests passed');

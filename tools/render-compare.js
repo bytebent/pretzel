@@ -15,7 +15,7 @@ const chord = (notes, t, d) => notes.map((n) => [n, t, d, 95]);
 const PLUCK = { ...env('senv', 1, [[0.01, 1], [0.7, 0.2]], 2, 3), ...env('aenv', 1, [[0.005, 1], [0.8, 0.7], [0.15, 0]], 2, 3) };
 const PAD = { ...env('senv', 1, [[1.2, 1], [1.0, 0.6]], 2, 3), ...env('aenv', 1, [[0.3, 1], [2, 0.9], [0.5, 0]], 2, 3) };
 const HOLD = env('aenv', 1, [[0.05, 1], [6, 1], [0.3, 0]], 2, 3);
-const COMMON = { warpkey1: 0, shapekey1: 0, velshape1: 0, velwarp1: 0, wenvdepth1: 0 };
+const COMMON = { lines: 0, warpkey1: 0, shapekey1: 0, velshape1: 0, velwarp1: 0, wenvdepth1: 0 };
 
 // Shape → Warp: A then B
 const AB = [

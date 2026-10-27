@@ -613,6 +613,8 @@
     aenv: { t: [0.005, 0.5, 0.3], l: [1, 0.7, 0], sus: 2, end: 3 },
     wenv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
     senv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
+    penv: { t: [0.05, 0.3], l: [0, 0], sus: 0, end: 2 },
+    menv: { t: [0.05, 0.5, 0.3], l: [1, 0.6, 0], sus: 2, end: 3 },
   };
   function envParams(name, line) {
     const d = ENV_DEFAULTS[name], out = [];
@@ -624,47 +626,90 @@
     out.push({ id: name + line + 'end', def: d.end, min: 1, max: 8, step: 1 });
     return out;
   }
+  // one line's parameters, ids ending in its number (h-harmonics as h<k>_<line>)
+  function lineParams(L) {
+    return [
+      { id: 'level' + L, def: 0, min: -48, max: 6 },                    // dB
+      { id: 'octave' + L, def: 0, min: -3, max: 3, step: 1 },
+      { id: 'fifth' + L, def: 0, min: 0, max: 1, step: 1 },              // +7 semitones
+      { id: 'detune' + L, def: L === 2 ? 7 : 0, min: -100, max: 100 },   // cents
+      { id: 'penvdepth' + L, def: 0, min: -24, max: 24 },                // semitones at pitch envelope level 1
+      { id: 'wfamily' + L, def: 0, min: 0, max: 3, step: 1 },            // FAMILIES: CZ, Vector, Smooth, Sync
+      { id: 'wave' + L, def: 0, min: 0, max: 6, step: 1 },               // WAVES
+      { id: 'pair' + L, def: 0, min: 0, max: 7, step: 1 },               // 0 none, else WAVES[n − 1] on odd cycles
+      { id: 'window' + L, def: 0, min: 0, max: 5, step: 1 },             // WINDOWS, on any wave
+      { id: 'vecx' + L, def: 0.5, min: 0, max: 1 },                      // Vector d (Bezier handle x) at Warp 1
+      { id: 'vecy' + L, def: 1.5, min: 0, max: 4 },                      // Vector v (Bezier handle y × 4) at Warp 1
+      { id: 'curve' + L, def: 1, min: 0, max: 2, step: 1 },              // Smooth: Power, Sigmoid, Bezier
+      { id: 'ratio' + L, def: 2, min: 1, max: 16 },                      // Sync ratio at Warp 1
+      { id: 'warp' + L, def: 0, min: 0, max: 1 },                        // warp amount before the envelope
+      { id: 'warpkey' + L, def: 0.3, min: 0, max: 1 },                   // key follow: less warp above middle C
+      { id: 'wenvdepth' + L, def: 1, min: -1, max: 1 },
+      { id: 'velwarp' + L, def: 0.3, min: 0, max: 1 },
+      { id: 'velamp' + L, def: 0.7, min: 0, max: 1 },
+      { id: 'sfamily' + L, def: 0, min: 0, max: 3, step: 1 },            // SHAPERS
+      { id: 'shape' + L, def: 0, min: 0, max: 1 },                       // drive into the shaper, before the envelope
+      { id: 'bias' + L, def: 0, min: -1, max: 1 },                       // input offset: even harmonics
+      ...Array.from({ length: NH }, (_, i) => ({ id: 'h' + (i + 1) + '_' + L, def: i === 0 ? 1 : 0, min: 0, max: 1 })),   // Chebyshev harmonics
+      { id: 'tilt' + L, def: 0, min: -1, max: 1 },                       // harmonic k × k^Tilt
+      { id: 'oddeven' + L, def: 0, min: -1, max: 1 },                    // > 0 cuts even, < 0 cuts odd (above the fundamental)
+      { id: 'fold' + L, def: 1, min: 0, max: 2, step: 1 },               // FOLDS
+      { id: 'sat' + L, def: 0, min: 0, max: 2, step: 1 },                // SATS
+      { id: 'keys' + L, def: 4, min: 2, max: MAX_KEYS, step: 1 },        // drawn keyframes in use
+      { id: 'morph' + L, def: 0, min: 0, max: 1 },                       // through the drawn keyframes
+      { id: 'order' + L, def: 0, min: 0, max: 2, step: 1 },              // ORDERS
+      { id: 'ordermorph' + L, def: 0, min: 0, max: 1 },                  // Morph: 0 Warp→Shape … 1 Shape→Warp
+      { id: 'swmode' + L, def: 0, min: 0, max: 1, step: 1 },             // Shape→Warp: Read (A), Bend (B)
+      { id: 'morphway' + L, def: 0, min: 0, max: 1, step: 1 },           // Morph: Through the warp, Shared
+      { id: 'twist' + L, def: 0, min: 0, max: 1 },                       // feedback of the shaped wave into its own phase
+      { id: 'shapekey' + L, def: 0.3, min: 0, max: 1 },                  // key follow: less shape above middle C
+      { id: 'senvdepth' + L, def: 0, min: -1, max: 1 },
+      { id: 'link' + L, def: 0, min: -1, max: 1 },                       // the Warp envelope also drives Shape
+      { id: 'velshape' + L, def: 0.3, min: 0, max: 1 },
+      ...envParams('wenv', L),
+      ...envParams('senv', L),
+      ...envParams('aenv', L),
+      ...envParams('penv', L),
+    ];
+  }
+  // modulation destinations: none, then each of these on both lines, line 1 or line 2
+  const DEST_IDS = ['pitch', 'level', 'detune', 'warp', 'vecx', 'vecy', 'ratio', 'shape', 'bias', 'tilt', 'oddeven', 'morph', 'ordermorph', 'twist'];
+  const DEST_LINES = ['both', '1', '2'];
+  const NDEST = 1 + DEST_IDS.length * 3;
+  function destName(v) { return v <= 0 ? 'none' : DEST_IDS[Math.floor((v - 1) / 3)] + ' ' + DEST_LINES[(v - 1) % 3]; }
+  const LFO_SHAPES = ['Sine', 'Triangle', 'Saw', 'Square', 'Random'];
+  const SYNC_BEATS = [0.125, 0.25, 1 / 3, 0.5, 2 / 3, 1, 2, 4, 8, 16];   // 1/32, 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2, 1 bar, 2, 4 bars
+  function modParams(name, n) {
+    return [
+      { id: name + n + 'dest1', def: 0, min: 0, max: NDEST - 1, step: 1 },
+      { id: name + n + 'depth1', def: 0, min: -1, max: 1 },
+      { id: name + n + 'dest2', def: 0, min: 0, max: NDEST - 1, step: 1 },
+      { id: name + n + 'depth2', def: 0, min: -1, max: 1 },
+    ];
+  }
   const PARAMS = [
     // voice
     { id: 'mode', def: 1, min: 0, max: 1, step: 1 },             // 0 mono, 1 poly (8 voices)
     { id: 'glide', def: 0, min: 0, max: 2, curve: 3 },           // s, mono only
-    // line 1
-    { id: 'wfamily1', def: 0, min: 0, max: 3, step: 1 },         // FAMILIES: CZ, Vector, Smooth, Sync
-    { id: 'wave1', def: 0, min: 0, max: 6, step: 1 },            // WAVES
-    { id: 'pair1', def: 0, min: 0, max: 7, step: 1 },            // 0 none, else WAVES[n − 1] on odd cycles
-    { id: 'window1', def: 0, min: 0, max: 5, step: 1 },          // WINDOWS, on any wave
-    { id: 'vecx1', def: 0.5, min: 0, max: 1 },                   // Vector d (Bezier handle x) at Warp 1
-    { id: 'vecy1', def: 1.5, min: 0, max: 4 },                   // Vector v (Bezier handle y × 4) at Warp 1
-    { id: 'curve1', def: 1, min: 0, max: 2, step: 1 },           // Smooth: Power, Sigmoid, Bezier
-    { id: 'ratio1', def: 2, min: 1, max: 16 },                   // Sync ratio at Warp 1
-    { id: 'warp1', def: 0, min: 0, max: 1 },                     // warp amount before the envelope
-    { id: 'warpkey1', def: 0.3, min: 0, max: 1 },                // key follow: less warp above middle C
-    { id: 'wenvdepth1', def: 1, min: -1, max: 1 },
-    { id: 'velwarp1', def: 0.3, min: 0, max: 1 },
-    { id: 'velamp1', def: 0.7, min: 0, max: 1 },
-    // shaper, line 1
-    { id: 'sfamily1', def: 0, min: 0, max: 3, step: 1 },         // SHAPERS
-    { id: 'shape1', def: 0, min: 0, max: 1 },                    // drive into the shaper, before the envelope
-    { id: 'bias1', def: 0, min: -1, max: 1 },                    // input offset: even harmonics
-    ...Array.from({ length: NH }, (_, i) => ({ id: 'h' + (i + 1) + '_1', def: i === 0 ? 1 : 0, min: 0, max: 1 })),   // Chebyshev harmonics
-    { id: 'tilt1', def: 0, min: -1, max: 1 },                    // harmonic k × k^Tilt
-    { id: 'oddeven1', def: 0, min: -1, max: 1 },                 // > 0 cuts even, < 0 cuts odd (above the fundamental)
-    { id: 'fold1', def: 1, min: 0, max: 2, step: 1 },            // FOLDS
-    { id: 'sat1', def: 0, min: 0, max: 2, step: 1 },             // SATS
-    { id: 'keys1', def: 4, min: 2, max: MAX_KEYS, step: 1 },     // drawn keyframes in use
-    { id: 'morph1', def: 0, min: 0, max: 1 },                    // through the drawn keyframes
-    { id: 'order1', def: 0, min: 0, max: 2, step: 1 },           // ORDERS
-    { id: 'ordermorph1', def: 0, min: 0, max: 1 },               // Morph: 0 Warp→Shape … 1 Shape→Warp
-    { id: 'swmode1', def: 0, min: 0, max: 1, step: 1 },          // Shape→Warp: Read (A), Bend (B)
-    { id: 'morphway1', def: 0, min: 0, max: 1, step: 1 },        // Morph: Through the warp, Shared
-    { id: 'twist1', def: 0, min: 0, max: 1 },                    // feedback of the shaped wave into its own phase
-    { id: 'shapekey1', def: 0.3, min: 0, max: 1 },               // key follow: less shape above middle C
-    { id: 'senvdepth1', def: 0, min: -1, max: 1 },
-    { id: 'link1', def: 0, min: -1, max: 1 },                    // the Warp envelope also drives Shape
-    { id: 'velshape1', def: 0.3, min: 0, max: 1 },
-    ...envParams('wenv', 1),
-    ...envParams('senv', 1),
-    ...envParams('aenv', 1),
+    { id: 'lines', def: 3, min: 0, max: 3, step: 1 },            // LINE_SELECT: 1, 2, 1+1′, 1+2
+    { id: 'ring', def: 0, min: 0, max: 1, step: 1 },             // line 2 × line 1
+    { id: 'noise', def: 0, min: 0, max: 1, step: 1 },            // noise on line 2's pitch
+    ...lineParams(1),
+    ...lineParams(2),
+    // modulators (per voice)
+    ...[1, 2].flatMap((n) => [
+      { id: 'lfo' + n + 'shape', def: 0, min: 0, max: 4, step: 1 },          // LFO_SHAPES
+      { id: 'lfo' + n + 'rate', def: 2, min: 0.01, max: 50, log: true },    // Hz
+      { id: 'lfo' + n + 'sync', def: 0, min: 0, max: 1, step: 1 },          // rate from tempo
+      { id: 'lfo' + n + 'div', def: 5, min: 0, max: SYNC_BEATS.length - 1, step: 1 },   // SYNC_BEATS: one cycle
+      { id: 'lfo' + n + 'retrig', def: 1, min: 0, max: 1, step: 1 },        // restart on each note
+      ...modParams('lfo', n),
+    ]),
+    ...[1, 2].flatMap((n) => [...envParams('menv', n), ...modParams('menv', n)]),
+    { id: 'wheeldest', def: 0, min: 0, max: NDEST - 1, step: 1 },
+    { id: 'wheeldepth', def: 0, min: -1, max: 1 },
+    { id: 'atdest', def: 0, min: 0, max: NDEST - 1, step: 1 },
+    { id: 'atdepth', def: 0, min: -1, max: 1 },
     // pitch and output
     { id: 'transpose', def: 0, min: -24, max: 24, step: 1 },
     { id: 'bendrange', def: 2, min: 2, max: 24, step: 1 },
@@ -746,14 +791,21 @@
     }
   }
 
-  /* ---------- one voice: one line for now ---------- */
-  class Voice {
-    constructor(eng) {
-      this.eng = eng;
-      this.note = -1; this.held = false; this.active = false; this.age = 0;
-      this.vel = 1; this.oct = 0; this.targetOct = 0; this.glideStep = 0;
+  /* ---------- one line: warp, shaper, Twist, envelopes ---------- */
+  // ids of a line's parameters, by name without the line number
+  function lineIndex(L) {
+    const ix = {};
+    lineParams(L).forEach((d) => { ix[d.id.slice(0, d.id.length - String(L).length).replace(/_$/, '')] = PINDEX[d.id]; });
+    return ix;
+  }
+  class Line {
+    constructor(voice, L) {
+      const eng = voice.eng;
+      this.voice = voice; this.eng = eng; this.L = L;
+      this.ix = lineIndex(L); this.src = L;      // src: whose settings it plays (line 1 for 1+1′)
       this.ph = 0; this.odd = 0;
-      this.wenv = new Env(eng, 'wenv1'); this.senv = new Env(eng, 'senv1'); this.aenv = new Env(eng, 'aenv1');
+      this.wenv = new Env(eng, 'wenv' + L); this.senv = new Env(eng, 'senv' + L); this.aenv = new Env(eng, 'aenv' + L);
+      this.penv = new Env(eng, 'penv' + L);
       this.sh = makeShaper();
       this.dcx = 0; this.dcy = 0; this.gain = 1;
       this.x1 = 0;               // the wave one sample back
@@ -767,52 +819,54 @@
       this.pre = { sh: this.sh, s: 0, def: 0 };       // the shaper on the phase (order), for waveAt
       this.sPost = 0;                                  // Shape after the warp, from orderSplit()
       this.k = {};          // per-block settings, filled by settings()
+      this.on = false;      // sounding in this voice
+      this.noise = false;   // CZ noise on its pitch (line 2)
+      this.pitchMod = 0;    // semitones from the modulators, per block
     }
-    // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
-    setTarget(note, glide) {
-      this.note = note;
-      this.targetOct = (note - 69) / 12;
-      const g = this.eng.p[PINDEX.glide];
-      if (!glide || g <= 0) { this.oct = this.targetOct; this.glideStep = 0; this.snap = true; }
-      else this.glideStep = Math.abs(this.targetOct - this.oct) / (g * this.eng.srOS);
+    // play the settings of line src (its own, or line 1's for 1+1′); envelopes follow
+    use(src) {
+      if (src === this.src) return;
+      this.src = src; this.ix = lineIndex(src);
+      for (const [env, n] of [[this.wenv, 'wenv'], [this.senv, 'senv'], [this.aenv, 'aenv'], [this.penv, 'penv']]) env.base = PINDEX[n + src + 't1'];
     }
-    trigger(vel) {
-      const wasActive = this.active;
-      this.vel = clamp(vel / 127, 0, 1);
-      this.active = true; this.held = true; this.age = ++this.eng.ageCounter;
-      if (!wasActive) { this.ph = 0; this.odd = 0; this.aenv.v = 0; this.wenv.v = 0; this.senv.v = 0; }
-      this.wenv.trigger(); this.senv.trigger(); this.aenv.trigger();
-      if (!wasActive) this.primeDc();
+    trigger(wasActive) {
+      if (!wasActive || !this.on) { this.ph = 0; this.odd = 0; this.aenv.v = 0; this.wenv.v = 0; this.senv.v = 0; this.penv.v = 0; }
+      this.wenv.trigger(); this.senv.trigger(); this.aenv.trigger(); this.penv.trigger();
+      if (!wasActive || !this.on) { this.snap = true; this.primeDc(); }
+      this.on = true;
     }
     release() {
-      if (!this.held) return;
-      this.held = false;
-      this.wenv.release(); this.senv.release(); this.aenv.release();
+      this.wenv.release(); this.senv.release(); this.aenv.release(); this.penv.release();
       if (this.aenv.done && this.aenv.v > 0) this.aenv.fade(0.01);
     }
+    done() { return !this.on || (this.aenv.done && (!this.voice.held || this.aenv.v === 0)); }
     // everything that is fixed for one block: pitch, waves, Warp and Shape scaling, the shaper
     settings() {
-      const e = this.eng, P = e.p, k = this.k;
-      const hz = 440 * Math.pow(2, this.oct + e.pitchOct), note = 69 + 12 * this.oct;
+      const e = this.eng, v = this.voice, P = v.vp, I = this.ix, k = this.k;
+      // pitch: the voice's note, then this line's octave, fifth, detune, pitch envelope and modulation
+      // (all zero adds nothing, so a plain line is exactly as before)
+      let st = P[I.octave] * 12 + P[I.fifth] * 7 + P[I.detune] / 100 + P[I.penvdepth] * this.penv.v + this.pitchMod;
+      if (this.L === 2) st += P[PINDEX.octave2] * 12 - P[I.octave] * 12 + P[PINDEX.fifth2] * 7 - P[I.fifth] * 7 + P[PINDEX.detune2] / 100 - P[I.detune] / 100;
+      const hz = 440 * Math.pow(2, v.oct + e.pitchOct + st / 12), note = 69 + 12 * v.oct;
       k.hz = hz; k.inc = hz / e.srOS;
-      const vl = 1 - this.vel;
-      k.vw = (1 - P[PINDEX.velwarp1] * vl) * Math.min(1, Math.pow(2, -P[PINDEX.warpkey1] * (note - 60) / 12));
-      k.vs = (1 - P[PINDEX.velshape1] * vl) * Math.min(1, Math.pow(2, -P[PINDEX.shapekey1] * (note - 60) / 12));
-      k.va = (1 - P[PINDEX.velamp1] * vl) * LEVEL;
-      k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
-      k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
-      k.order = Math.round(P[PINDEX.order1]); k.tm = P[PINDEX.ordermorph1];
+      const vl = 1 - v.vel;
+      k.vw = (1 - P[I.velwarp] * vl) * Math.min(1, Math.pow(2, -P[I.warpkey] * (note - 60) / 12));
+      k.vs = (1 - P[I.velshape] * vl) * Math.min(1, Math.pow(2, -P[I.shapekey] * (note - 60) / 12));
+      k.va = (1 - P[I.velamp] * vl) * LEVEL * Math.pow(10, P[I.level] / 20) * v.mixGain;
+      k.wbase = P[I.warp]; k.wdepth = P[I.wenvdepth];
+      k.sbase = P[I.shape]; k.sdepth = P[I.senvdepth]; k.link = P[I.link];
+      k.order = Math.round(P[I.order]); k.tm = P[I.ordermorph];
       // Twist depth in cycles, before the shaper's steepening divides it (in render)
       // The last quarter of the knob deepens it up to 4 times: the steady range ends near ¾, and above
       // it the loop breaks into controlled chaos (design.md §7)
-      const tw = P[PINDEX.twist1], over = Math.max(0, (tw - 0.75) / 0.25);
+      const tw = P[I.twist], over = Math.max(0, (tw - 0.75) / 0.25);
       k.twist = tw * (1 + 3 * over * over) * TWIST_MAX * Math.min(1, Math.sqrt(TWIST_REF / hz));
-      k.def = Math.round(P[PINDEX.swmode1]); k.way = Math.round(P[PINDEX.morphway1]);
+      k.def = Math.round(P[I.swmode]); k.way = Math.round(P[I.morphway]);
       this.pre.def = k.def;
-      const pr = Math.round(P[PINDEX.pair1]);
-      k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);
-      k.fam = Math.round(P[PINDEX.wfamily1]);
-      k.vx = P[PINDEX.vecx1]; k.vy = P[PINDEX.vecy1]; k.curve = Math.round(P[PINDEX.curve1]); k.ratio = P[PINDEX.ratio1];
+      const pr = Math.round(P[I.pair]);
+      k.w0 = Math.round(P[I.wave]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[I.window]);
+      k.fam = Math.round(P[I.wfamily]);
+      k.vx = P[I.vecx]; k.vy = P[I.vecy]; k.curve = Math.round(P[I.curve]); k.ratio = P[I.ratio];
       if (k.fam > 0) { const wf = k.fam === 1 ? 7 : k.fam === 3 ? 11 : 8 + k.curve; k.w0 = k.w1 = wf; }   // no wave pairs outside CZ
       // pitch cap: the steepest slope SLOPE/p never reads the cosine faster than WARP_FMAX
       k.cap = Math.max(SLOPE[k.w0], SLOPE[k.w1]) * hz / (WARP_FMAX * e.srOS);
@@ -826,15 +880,15 @@
       // the shaper
       const sh = this.sh;
       sh.ver++;
-      sh.fam = Math.round(P[PINDEX.sfamily1]); sh.bias = P[PINDEX.bias1];
-      sh.sub = sh.fam === 1 ? Math.round(P[PINDEX.fold1]) : sh.fam === 2 ? Math.round(P[PINDEX.sat1]) : 0;
+      sh.fam = Math.round(P[I.sfamily]); sh.bias = P[I.bias];
+      sh.sub = sh.fam === 1 ? Math.round(P[I.fold]) : sh.fam === 2 ? Math.round(P[I.sat]) : 0;
       if (sh.fam === 0) {
         const h = e.harm;
-        for (let i = 0; i < NH; i++) h[i] = P[PINDEX.h1_1 + i];
-        chebWeights(sh.e, h, P[PINDEX.tilt1], P[PINDEX.oddeven1]);
+        for (let i = 0; i < NH; i++) h[i] = P[I.h1 + i];
+        chebWeights(sh.e, h, P[I.tilt], P[I.oddeven]);
       } else if (sh.fam === 3) {
-        const c = e.curves[0];
-        morphCurves(sh, c.keys, c.F, Math.round(P[PINDEX.keys1]), P[PINDEX.morph1]);
+        const c = e.curves[this.src - 1];
+        morphCurves(sh, c.keys, c.F, Math.round(P[I.keys]), P[I.morph]);
       }
       return k;
     }
@@ -909,11 +963,10 @@
       this.rm += r.m; this.ro += r.o; this.rp += r.p;
       return xc;
     }
-    render(n, out) {
-      const e = this.eng;
-      // glide (mono): pitch moves toward the target, per block
-      const dOct = this.targetOct - this.oct, step = this.glideStep * n;
-      this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
+    // render n internal samples, adding into out; raw (if given) gets the line's wave at its level but
+    // without the amp envelope, for ring modulation
+    render(n, out, raw) {
+      const e = this.eng, v = this.voice;
       const k = this.settings(), sh = this.sh;
       const { vw, vs, va, wbase, wdepth, sbase, sdepth, link, w0, w1, win } = k;
       // pitch moves smoothly across the block (a glide steps once per block otherwise, and the pitch cap
@@ -930,14 +983,16 @@
       let g = this.gain;
       const dg = (g1 - g) / n;
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
-      const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
+      const wenv = this.wenv, senv = this.senv, aenv = this.aenv, penv = this.penv;
       let wa = NaN, ws = NaN;
       const twist = k.twist, twE = 1 + TWO_PI * Math.min(twist, TWIST_MAX);
       if (!twist) this.toff = 0;
       for (let i = 0; i < n; i++) {
-        const fri = fr0 + dfr * (i + 1), q = fri / fr1, inc = fri;
+        const fri = fr0 + dfr * (i + 1), q = fri / fr1;
+        // CZ noise: line 2's pitch jumps by up to ±90% each sample (the voice's own seeded generator)
+        const inc = this.noise ? fri * (1 + NOISE_DEPTH * v.rand()) : fri;
         k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
-        const we = wenv.next(), se = senv.next(), ae = aenv.next();
+        const we = wenv.next(), se = senv.next(), ae = aenv.next(); penv.next();
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
         const sAll = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
         // the pivot, resonance ratio and band limit only change when Warp, Shape or the pitch does
@@ -1015,19 +1070,159 @@
         const y = x - dcx + R * dcy; dcx = x; dcy = y;
         g += dg;
         out[i] += y * ae * ae * g * va;
+        if (raw) raw[i] = y * g;
       }
       this.gain = g1;
       this.ph = ph; this.odd = odd; this.x1 = x1;
       this.dcx = dcx; this.dcy = Math.abs(dcy) < 1e-20 ? 0 : dcy;
-      if (aenv.done && (!this.held || aenv.v === 0)) { this.active = false; this.held = false; }
+      if (aenv.done && (!v.held || aenv.v === 0)) this.on = false;
     }
   }
+
+  /* ---------- one voice: two lines and the modulators ---------- */
+  const LINE_SELECT = ['1', '2', '1+1′', '1+2'];
+  const NOISE_DEPTH = 0.9;
+  const RING_GAIN = 2;       // a product of two waves is quieter than either
+  const MIX2 = Math.SQRT1_2; // two lines together: each 3 dB down
+  class Voice {
+    constructor(eng, seed) {
+      this.eng = eng;
+      this.note = -1; this.held = false; this.active = false; this.age = 0;
+      this.vel = 1; this.oct = 0; this.targetOct = 0; this.glideStep = 0;
+      this.vp = new Float64Array(PARAMS.length);       // the parameters with this voice's modulation
+      this.mixGain = 1;
+      this.lines = [new Line(this, 1), new Line(this, 2)];
+      this.tmp = new Float32Array(BLOCK * OS); this.raw = new Float32Array(BLOCK * OS);
+      this.rng = seed >>> 0 || 1;
+      this.lfoPh = [0, 0]; this.lfoSH = [0, 0]; this.lfoPrev = [0, 0];
+      this.menv = [new Env(eng, 'menv1'), new Env(eng, 'menv2')];
+      this.acc = new Float64Array(NDEST);
+      this.vp.set(eng.p);
+    }
+    // xorshift32 → −1 … 1
+    rand() {
+      let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0;
+      return this.rng / 2147483648 - 1;
+    }
+    // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
+    setTarget(note, glide) {
+      this.note = note;
+      this.targetOct = (note - 69) / 12;
+      const g = this.eng.p[PINDEX.glide];
+      if (!glide || g <= 0) { this.oct = this.targetOct; this.glideStep = 0; for (const l of this.lines) l.snap = true; }
+      else this.glideStep = Math.abs(this.targetOct - this.oct) / (g * this.eng.srOS);
+    }
+    // which lines sound, and whose settings each plays
+    routing() {
+      const P = this.eng.p, sel = Math.round(P[PINDEX.lines]);
+      const [l1, l2] = this.lines;
+      l2.use(sel === 2 ? 1 : 2);
+      this.use1 = sel !== 1; this.use2 = sel !== 0;
+      this.mixGain = this.use1 && this.use2 ? MIX2 : 1;
+      l2.noise = P[PINDEX.noise] >= 0.5 && this.use2;
+      this.ringOn = P[PINDEX.ring] >= 0.5 && this.use1 && this.use2;
+    }
+    trigger(vel) {
+      const wasActive = this.active;
+      this.vel = clamp(vel / 127, 0, 1);
+      this.active = true; this.held = true; this.age = ++this.eng.ageCounter;
+      const P = this.eng.p;
+      if (!wasActive) {
+        for (let j = 0; j < 2; j++) {
+          if (P[PINDEX['lfo' + (j + 1) + 'retrig']] >= 0.5) { this.lfoPh[j] = 0; this.lfoSH[j] = this.rand(); }
+          this.menv[j].v = 0;
+        }
+      }
+      for (const m of this.menv) m.trigger();
+      this.routing();
+      this.modulate(0);
+      if (this.use1) this.lines[0].trigger(wasActive); else this.lines[0].on = false;
+      if (this.use2) this.lines[1].trigger(wasActive); else this.lines[1].on = false;
+    }
+    release() {
+      if (!this.held) return;
+      this.held = false;
+      for (const l of this.lines) if (l.on) l.release();
+      for (const m of this.menv) m.release();
+    }
+    // The modulators, once per block: each adds depth × its value to its destinations, in knob
+    // positions (0–1), and pitch in semitones (±12 at depth 1). n: internal samples since the last call.
+    modulate(n) {
+      const e = this.eng, P = e.p, acc = this.acc, vp = this.vp;
+      vp.set(P);
+      acc.fill(0);
+      let any = false;
+      const add = (dest, depth, m) => { if (dest > 0 && depth !== 0) { acc[dest] += depth * m; any = true; } };
+      for (let j = 0; j < 2; j++) {
+        const b = 'lfo' + (j + 1);
+        const d1 = P[PINDEX[b + 'dest1']], d2 = P[PINDEX[b + 'dest2']];
+        // advance the LFO
+        const rate = P[PINDEX[b + 'sync']] >= 0.5 ? e.tempo / 60 / SYNC_BEATS[Math.round(P[PINDEX[b + 'div']])] : P[PINDEX[b + 'rate']];
+        let ph = this.lfoPh[j] + rate * n / e.srOS;
+        if (ph >= 1) { ph -= Math.floor(ph); this.lfoSH[j] = this.rand(); }
+        this.lfoPh[j] = ph;
+        if (d1 <= 0 && d2 <= 0) continue;
+        let m;
+        switch (Math.round(P[PINDEX[b + 'shape']])) {
+          case 1: m = 1 - 4 * Math.abs(ph - 0.5); break;          // triangle
+          case 2: m = 2 * ph - 1; break;                          // saw up
+          case 3: m = ph < 0.5 ? 1 : -1; break;                   // square
+          case 4: m = this.lfoSH[j]; break;                       // random (sample and hold)
+          default: m = Math.sin(TWO_PI * ph);                     // sine
+        }
+        add(Math.round(d1), P[PINDEX[b + 'depth1']], m); add(Math.round(d2), P[PINDEX[b + 'depth2']], m);
+      }
+      for (let j = 0; j < 2; j++) {
+        const b = 'menv' + (j + 1), env = this.menv[j];
+        for (let i = 0; i < n; i++) env.next();
+        add(Math.round(P[PINDEX[b + 'dest1']]), P[PINDEX[b + 'depth1']], env.v);
+        add(Math.round(P[PINDEX[b + 'dest2']]), P[PINDEX[b + 'depth2']], env.v);
+      }
+      add(Math.round(P[PINDEX.wheeldest]), P[PINDEX.wheeldepth], e.wheel);
+      add(Math.round(P[PINDEX.atdest]), P[PINDEX.atdepth], e.aftertouch);
+      this.lines[0].pitchMod = 0; this.lines[1].pitchMod = 0;
+      if (!any) return;
+      for (let dest = 1; dest < NDEST; dest++) {
+        const a = acc[dest];
+        if (a === 0) continue;
+        const name = DEST_IDS[Math.floor((dest - 1) / 3)], which = (dest - 1) % 3;
+        for (let L = 1; L <= 2; L++) {
+          if (which !== 0 && which !== L) continue;
+          if (name === 'pitch') { this.lines[L - 1].pitchMod += 12 * a; continue; }
+          // a line playing line 1's settings (1+1′) follows line 1's modulation
+          const idx = PINDEX[name + L], d = PARAMS[idx];
+          vp[idx] = fromNorm(d, clamp(toNorm(d, vp[idx]) + a, 0, 1));
+        }
+      }
+    }
+    render(n, out) {
+      // glide (mono): pitch moves toward the target, per block
+      const dOct = this.targetOct - this.oct, step = this.glideStep * n;
+      this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
+      this.routing();
+      this.modulate(n);
+      const [l1, l2] = this.lines;
+      if (this.ringOn && l1.on && l2.on) {
+        // ring: line 2 (with its own envelope) times line 1's wave
+        const tmp = this.tmp, raw = this.raw;
+        l1.render(n, out, raw);
+        tmp.fill(0);
+        l2.render(n, tmp, null);
+        for (let i = 0; i < n; i++) out[i] += tmp[i] * raw[i] * RING_GAIN;
+      } else {
+        if (l1.on) l1.render(n, out, null);
+        if (l2.on) l2.render(n, out, null);
+      }
+      if (l1.done() && l2.done()) { this.active = false; this.held = false; l1.on = false; l2.on = false; }
+    }
+  }
+
 
   /* ---------- the engine ---------- */
   class PretzelEngine {
     constructor(sampleRate, seed) {
       this.sr = sampleRate; this.srOS = sampleRate * OS;
-      this.seed = (seed >>> 0) || 0x9e3779b9;   // used from batch 09 (Noise, random LFO)
+      this.seed = (seed >>> 0) || 0x9e3779b9;   // per-voice generators: Noise, random LFO
       this.p = new Float64Array(PARAMS.length);
       PARAMS.forEach((d, i) => { this.p[i] = d.def; });
       this.fir = makeFir();
@@ -1042,13 +1237,14 @@
       this.volSm = Math.pow(10, PARAMS[PINDEX.volume].def / 20);
       this.smooth = 1 - Math.exp(-BLOCK / (0.02 * sampleRate));
       this.harm = new Float64Array(NH);
-      // drawn keyframes per line (line 2 comes in batch 09), with their antiderivatives
-      this.curves = [0].map(() => {
+      // drawn keyframes per line, with their antiderivatives
+      this.curves = [0, 1].map(() => {
         const keys = DEFAULT_CURVES.map((y) => Float64Array.from(y));
         return { keys, F: keys.map(antiderivative) };
       });
+      this.wheel = 0; this.aftertouch = 0; this.tempo = 120;
       this.voices = [];
-      for (let i = 0; i < MAX_VOICES; i++) this.voices.push(new Voice(this));
+      for (let i = 0; i < MAX_VOICES; i++) this.voices.push(new Voice(this, (this.seed + i * 0x6d2b79f5) >>> 0));
       this.info = { voices: 0, idle: true };
     }
 
@@ -1071,6 +1267,9 @@
       c.F[key] = antiderivative(c.keys[key]);
     }
     setBend(norm) { this.bendNorm = clamp(norm, -1, 1); }
+    setModWheel(v) { this.wheel = clamp(v, 0, 1); }
+    setAftertouch(v) { this.aftertouch = clamp(v, 0, 1); }
+    setTempo(bpm) { this.tempo = clamp(bpm, 20, 400); }
 
     noteOn(note, vel) {
       if (vel <= 0) { this.noteOff(note); return; }
@@ -1153,6 +1352,6 @@
 
   PretzelEngine.BLOCK = BLOCK; PretzelEngine.OS = OS; PretzelEngine.MAX_VOICES = MAX_VOICES;
   PretzelEngine.toNorm = toNorm; PretzelEngine.fromNorm = fromNorm;
-  if (typeof module !== 'undefined' && module.exports) module.exports = { PretzelEngine, PARAMS, core };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { PretzelEngine, PARAMS, core, DEST_IDS, NDEST, destName, LINE_SELECT, LFO_SHAPES, SYNC_BEATS };
   else root.PretzelEngine = PretzelEngine;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
