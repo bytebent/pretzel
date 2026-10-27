@@ -1,0 +1,1112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pretzel</title>
+<style>
+
+:root{
+  --platinum:#dcdce0; --platinum-hi:#ececef; --etch:#9c9ca4; --ink:#000; --ink-soft:#4a4a52; --inset:#f4f4f6; --desk:#b9b9c0;
+  --blue:#f5821f; --blue-dk:#b4570b; --blue-lt:#ffc994; --blue-deep:#7a3906; --graphite:#6e6e78; --screen:#0b0b0e; --lcd:#ffc994;
+  --ui:"Lucida Grande","Lucida Sans Unicode",Geneva,Verdana,sans-serif; --mono:Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(circle at 1px 1px, rgba(0,0,0,.09) 1px, transparent 1.5px) 0 0/6px 6px, var(--desk);
+  font:13px/1.45 var(--ui); color:var(--ink); padding:24px 16px 40px; -webkit-user-select:none; user-select:none}
+.window{max-width:1060px;margin:0 auto;
+  background:repeating-linear-gradient(0deg, rgba(255,255,255,.55) 0 1px, rgba(255,255,255,0) 1px 2px, rgba(0,0,0,.035) 2px 3px, rgba(0,0,0,0) 3px 4px), var(--platinum);
+  border:1px solid #7d7d86;border-radius:9px;box-shadow:0 1px 0 #fff inset, 0 12px 32px rgba(0,0,0,.22);overflow:hidden}
+.titlebar{display:flex;align-items:center;gap:12px;padding:9px 14px 8px;background:linear-gradient(#f6f6f8,#d6d6db);border-bottom:1px solid #8e8e96}
+.mark{width:22px;height:18px;border-radius:3px;background:var(--graphite);box-shadow:0 0 0 1px rgba(0,0,0,.35);position:relative;flex:none;overflow:hidden}
+.mark::after{content:"";position:absolute;left:0;right:0;top:7px;height:4px;background:var(--blue)}
+.titlebar h1{margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px}
+.titlebar .sub{color:var(--ink-soft);font-size:11px}
+.titlebar .sub .ver{margin-left:6px;color:#7a7a84}
+.titlebar .tag{margin-left:auto;color:var(--ink-soft);font-size:11px}
+.body{padding:14px 18px 16px}
+
+/* screen */
+.screen{background:var(--screen);border-radius:6px;padding:10px;box-shadow:0 0 0 1px #000,0 2px 6px rgba(0,0,0,.5) inset;position:relative}
+.view{position:relative}
+.view canvas{display:block;width:100%;height:180px;border-radius:3px;background:#060608}
+.view canvas.axis{position:absolute;inset:0;background:transparent;pointer-events:none}
+.view .lbl{position:absolute;left:8px;top:6px;font:10px/1 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:1px;pointer-events:none}
+.readouts{display:flex;flex-wrap:wrap;gap:4px 18px;font:11px/1 var(--mono);color:var(--lcd);margin-top:8px;letter-spacing:1px}
+.readouts b{font-weight:400;opacity:.6;margin-right:6px}
+.readouts .hot{color:#fff}
+.readouts .warn{color:#fff;background:var(--blue-dk);padding:1px 4px;border-radius:2px;margin:-1px -4px}
+.power{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(11,11,14,.86);border-radius:6px;z-index:2;color:var(--lcd);font:11px var(--mono);letter-spacing:1px}
+.power.hide{display:none}
+
+/* controls */
+.rows{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+fieldset{flex:1 1 auto;margin:0;border:1px solid var(--etch);border-radius:6px;padding:8px 12px 10px;background:rgba(236,236,239,.7);box-shadow:0 1px 0 #fff, inset 0 1px 0 #fff;min-width:0}
+legend{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;padding:0 6px;display:flex;align-items:center;gap:6px}
+legend .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
+.knobs{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;justify-content:space-around}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;width:64px}
+.knob.big{width:92px}
+.dial{--a0:0deg;--a1:0deg;--c:var(--blue);position:relative;width:44px;height:44px;border-radius:50%;cursor:ns-resize;touch-action:none;outline:none;
+  background:conic-gradient(from 225deg, #b9b9c0 0 var(--a0), var(--c) var(--a0) var(--a1), #b9b9c0 var(--a1) 270deg, transparent 270deg)}
+.knob.big .dial{width:70px;height:70px}
+.dial::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--platinum-hi)}
+.dial .cap{position:absolute;inset:6px;border-radius:50%;
+  background:radial-gradient(circle at 50% 22%, rgba(255,255,255,.95) 0 18%, rgba(255,255,255,0) 46%), radial-gradient(circle at 50% 80%, #f7f7fa, #c8c8ce 60%, #9a9aa3);
+  box-shadow:0 2px 3px rgba(0,0,0,.35), 0 0 0 1px #7d7d86}
+.knob.big .dial .cap{inset:8px}
+.dial .ptr{position:absolute;inset:6px;border-radius:50%;pointer-events:none}
+.knob.big .dial .ptr{inset:8px}
+.dial .ptr::after{content:"";position:absolute;left:50%;top:3px;width:3px;height:30%;margin-left:-1.5px;border-radius:2px;background:#1a1a1e}
+.dial .mark30{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.dial .mark30::after{content:"";position:absolute;left:50%;top:-3px;width:2px;height:7px;margin-left:-1px;background:var(--blue-deep);border-radius:1px}
+.dial:focus-visible{box-shadow:0 0 0 2px var(--blue)}
+.knob .name{font-weight:700;white-space:nowrap}
+.val{font:700 10.5px var(--ui);background:var(--inset);box-shadow:inset 0 1px 2px rgba(0,0,0,.25);border-radius:3px;padding:1px 6px;min-width:56px;text-align:center;white-space:nowrap}
+
+.seg{display:inline-flex;flex-wrap:wrap;justify-content:center;border:1px solid #7d7d86;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.seg button{font:700 11px var(--ui);border:0;padding:4px 10px;cursor:pointer;color:#222;background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea)}
+.seg button+button{border-left:1px solid #9c9ca4}
+.seg button[aria-pressed="true"]{color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,.3);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45)}
+.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.segwrap{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;font-weight:700;padding-bottom:4px}
+.chips{display:flex;gap:3px;margin-top:2px}
+.chips button{font:700 9.5px var(--ui);border:1px solid #7d7d86;border-radius:8px;padding:1px 5px;cursor:pointer;background:linear-gradient(#fff,#d8d8dd);color:#222}
+.chips button:hover{background:linear-gradient(var(--blue-lt),var(--blue));color:#fff;border-color:var(--blue-dk)}
+.curve{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.curve canvas{width:96px;height:46px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset}
+
+.gel{display:inline-flex;align-items:center;padding:6px 18px;border-radius:999px;font:700 12px var(--ui);color:#fff;border:1px solid var(--blue-dk);position:relative;cursor:pointer;
+  background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45);box-shadow:0 2px 4px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.5) inset;text-shadow:0 -1px 0 rgba(0,0,0,.3)}
+.gel::before{content:"";position:absolute;left:10px;right:10px;top:2px;height:45%;border-radius:999px;background:linear-gradient(rgba(255,255,255,.75),rgba(255,255,255,.1));pointer-events:none}
+.gel.grey{color:#222;border-color:#7d7d86;text-shadow:0 1px 0 #fff;background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea)}
+.gel.small{padding:3px 12px;font-size:11px}
+.gel:focus-visible{outline:2px solid var(--blue-dk);outline-offset:2px}
+.dim{opacity:.4}
+
+/* pages */
+.tabs{display:flex;gap:0;margin-top:14px;border-bottom:1px solid #8e8e96;padding-left:10px}
+.tabs button{font:700 12px var(--ui);border:1px solid #8e8e96;border-bottom:0;border-radius:7px 7px 0 0;padding:6px 18px 5px;margin-right:-1px;cursor:pointer;color:#222;
+  background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea);display:inline-flex;align-items:center;gap:7px;position:relative;top:1px}
+.tabs button[aria-selected="true"]{color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,.3);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45);border-color:var(--blue-dk)}
+.tabs button:focus-visible{outline:2px solid var(--blue-dk);outline-offset:1px}
+.led{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#eee,#9c9ca4 60%,#6e6e78);box-shadow:0 0 0 1px rgba(0,0,0,.45) inset;flex:none}
+.led.on{background:radial-gradient(circle at 35% 30%,#fff0df,var(--blue) 60%,var(--blue-dk));box-shadow:0 0 6px var(--blue),0 0 0 1px rgba(0,0,0,.45) inset}
+.page[hidden]{display:none}
+.page .rows{margin-top:12px}
+.lfos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.lfo .knobs{display:grid;grid-template-columns:140px repeat(3, minmax(64px, 1fr));gap:10px 10px;align-items:end;justify-items:center}
+.lfo .knobs > :nth-child(1){grid-column:1;grid-row:1;justify-self:start;align-items:flex-start}
+.lfo .knobs > :nth-child(2){grid-column:2 / 5;grid-row:1}
+.lfo .knobs > :nth-child(3){grid-column:1;grid-row:2 / 4;align-self:center;justify-self:start}
+.lfo .knobs > :nth-child(4){grid-column:2;grid-row:2}
+.lfo .knobs > :nth-child(5){grid-column:2;grid-row:3}
+.lfo .knobs > :nth-child(6){grid-column:3;grid-row:2}
+.lfo .knobs > :nth-child(7){grid-column:4;grid-row:2}
+.lfo .knobs > :nth-child(8){grid-column:3 / 5;grid-row:3}
+.lfo .seg button{padding:4px 8px}
+.lfo legend .led{margin-left:2px}
+.lfohead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;width:100%}
+.lfohead label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700}
+.scope{width:132px;height:58px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;display:block}
+.dial .moddot{position:absolute;inset:0;border-radius:50%;pointer-events:none;display:none}
+.dial .moddot::after{content:"";position:absolute;left:50%;top:-2px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px var(--blue-dk),0 0 6px var(--blue)}
+.dial .moddot.on{display:block}
+.modnote{font-size:11px;color:var(--ink-soft);margin-top:8px}
+/* bench extras */
+.extras{margin-top:12px;border-style:dashed;background:rgba(244,244,246,.55)}
+.extras legend{color:var(--ink-soft)}
+.prow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+select,input[type=number]{font:12px var(--ui);padding:3px 6px;border:1px solid #7d7d86;border-radius:4px;background:linear-gradient(#fff,#ececef);box-shadow:inset 0 1px 1px rgba(0,0,0,.08)}
+select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.lane{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;margin-top:8px}
+.lane canvas{width:100%;height:54px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none}
+.check{display:inline-flex;align-items:center;gap:7px;font-weight:700;cursor:pointer}
+.check input{appearance:none;-webkit-appearance:none;width:16px;height:16px;margin:0;border-radius:4px;border:1px solid #7d7d86;cursor:pointer;
+  background:linear-gradient(#fff,#d8d8dd);box-shadow:0 1px 2px rgba(0,0,0,.2);position:relative}
+.check input:checked{border-color:var(--blue-dk);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45)}
+.check input:checked::after{content:"";position:absolute;left:5px;top:1px;width:4px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.check input:focus-visible{box-shadow:0 0 0 2px var(--blue)}
+.note{font-size:11px;color:var(--ink-soft)}
+
+/* keyboard */
+.play{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:14px}
+.bend{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;width:50px}
+.bend input{writing-mode:vertical-lr;direction:rtl;width:24px;height:96px}
+.kbd{position:relative;height:118px;border-radius:6px;background:linear-gradient(#3a3a40,#1d1d22);padding:8px 8px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 4px rgba(0,0,0,.3)}
+.keys{position:relative;height:100%}
+.key{position:absolute;top:0;bottom:0;border-radius:0 0 5px 5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font:700 11px var(--mono);cursor:pointer;touch-action:none}
+.key.w{background:linear-gradient(#fff,#e6e6ea);border:1px solid #6e6e78;color:#6e6e78;z-index:1}
+.key.b{background:linear-gradient(#3b3b42,#111);height:62%;bottom:auto;color:#bbb;z-index:2;border:1px solid #000;font-size:10px;padding-bottom:4px}
+.key.on.w{background:linear-gradient(#ffe2c4,var(--blue));color:#fff}
+.key.on.b{background:linear-gradient(var(--blue-lt),var(--blue-dk));color:#fff}
+.key .c{position:absolute;top:6px;font:9px var(--ui);color:#9c9ca4;font-weight:400}
+
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:12px;font-size:11px;color:var(--ink-soft)}
+.foot .sp{margin-left:auto}
+.err{display:none;margin-top:10px;padding:8px 10px;border-left:4px solid var(--blue-dk);background:#fff1e3;font-size:12px}
+@media (max-width:720px){ .lfos{grid-template-columns:1fr}
+  .lfo .knobs{grid-template-columns:repeat(3, 1fr)}
+  .lfo .knobs > :nth-child(1){grid-column:1 / 4;grid-row:1}
+  .lfo .knobs > :nth-child(2){grid-column:1 / 4;grid-row:2}
+  .lfo .knobs > :nth-child(3){grid-column:1 / 4;grid-row:3;justify-self:center}
+  .lfo .knobs > :nth-child(4){grid-column:1;grid-row:4}
+  .lfo .knobs > :nth-child(6){grid-column:2;grid-row:4}
+  .lfo .knobs > :nth-child(7){grid-column:3;grid-row:4}
+  .lfo .knobs > :nth-child(5){grid-column:1 / 4;grid-row:5}
+  .lfo .knobs > :nth-child(8){grid-column:1 / 4;grid-row:6}
+  .scope{width:220px} .titlebar .tag{display:none} .lane{grid-template-columns:auto 1fr} .lane canvas{grid-column:1 / -1} .play{grid-template-columns:1fr} .bend{flex-direction:row;width:auto} .bend input{writing-mode:horizontal-tb;direction:ltr;width:160px;height:auto} }
+/* pretzel additions */
+[hidden]{display:none !important}
+.sliders{display:flex;gap:6px}
+:root{ --green:#61bb46; --green-dk:#3c8a2a; }
+.mark::before{content:"";position:absolute;left:0;right:0;top:12px;height:3px;background:var(--green)}
+.top{display:grid;grid-template-columns:1fr 210px;gap:8px}
+.panel{position:relative}
+.panel canvas{display:block;width:100%;border-radius:3px;background:#060608}
+.panel .lbl{position:absolute;left:8px;top:6px;font:10px/1 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:1px;pointer-events:none}
+.panel .lbl2{position:absolute;left:8px;bottom:6px;font:10px/1.5 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:.5px;pointer-events:none}
+#knot{height:316px}
+.side{display:grid;grid-template-rows:repeat(3,1fr);gap:8px}
+.side canvas{height:100px}
+.screen .view{margin-top:8px}
+.view canvas#spec,.view canvas#axis{height:110px}
+legend .dot.g{background:var(--green)}
+.tabs .sw{width:8px;height:8px;border-radius:2px;display:inline-block}
+.part{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;justify-content:space-around;width:100%;padding-top:6px;border-top:1px dotted var(--etch);margin-top:4px}
+.part[hidden]{display:none}
+.knobs select{max-width:170px}
+.edit{display:flex;flex-direction:column;gap:6px;width:100%}
+.edit canvas{width:100%;height:120px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none;display:block}
+.edit .row{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:11px;font-weight:700}
+.edit .ro{font:10.5px var(--mono);color:var(--ink-soft);font-weight:400;margin-left:auto}
+.bars canvas{height:84px}
+.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%}
+.frames canvas{width:100%;height:64px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none;display:block}
+.frames .f{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;align-items:center}
+.frames .f.dim{opacity:.4}
+.wide{flex:1 1 100%}
+.mods{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.dest{display:flex;gap:8px;align-items:flex-end}
+@media (max-width:720px){ .top{grid-template-columns:1fr} .side{grid-template-rows:none;grid-template-columns:repeat(3,1fr)} .side canvas{height:80px} .mods{grid-template-columns:1fr} .sliders{flex-direction:column} #knot{height:280px} }
+</style>
+</head>
+<body>
+<div class="window" role="application" aria-label="pretzel test bench">
+  <div class="titlebar">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>pretzel</h1>
+    <span class="sub">Bytebent Audio<span class="ver">bench v0.1</span></span>
+    <span class="tag">phase distortion and waveshaping</span>
+  </div>
+  <div class="body">
+    <div class="screen">
+      <div class="top">
+        <div class="panel">
+          <canvas id="knot" aria-label="The wave drawn around a pretzel: the level bends the line, ticks mark even steps of the phase the warp reads"></canvas>
+          <span class="lbl">PRETZEL · NEWEST VOICE</span>
+          <span class="lbl2" id="knotInfo"></span>
+        </div>
+        <div class="side">
+          <div class="panel"><canvas id="gView" aria-label="The warp curve: the phase the cosine is read at, over one cycle"></canvas><span class="lbl">WARP g</span></div>
+          <div class="panel"><canvas id="sView" aria-label="The shaper's transfer curve at the Shape it has now"></canvas><span class="lbl">SHAPER S</span></div>
+          <div class="panel"><canvas id="wView" aria-label="One cycle of the wave on a straight line"></canvas><span class="lbl">WAVE</span></div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="spec" aria-label="Scrolling spectrogram of the output, 0 to 20 kHz"></canvas>
+        <canvas id="axis" class="axis" aria-hidden="true"></canvas>
+        <span class="lbl">SPECTROGRAM · 0–20 kHz · LAST 3 S</span>
+      </div>
+      <div class="readouts" aria-live="off">
+        <span><b>VOICES</b><span id="roVo">0</span></span>
+        <span><b>OCT</b><span id="roOct">C3</span></span>
+        <span><b>VEL</b><span id="roVel">100</span></span>
+        <span><b>BEND</b><span id="roBend">0</span></span>
+        <span title="Share of one CPU core the engine needs to keep up, averaged over half a second; peak is the slowest single audio callback. This is the JavaScript reference engine; the plugin's C++ will be lighter."><b>DSP</b><span id="roCpu">—</span></span>
+      </div>
+      <div class="power" id="power">
+        <button class="gel" id="powerBtn" type="button">Power on</button>
+        <span>PLAY WITH THE COMPUTER KEYBOARD: A–; · Z/X OCTAVE · C/V VELOCITY</span>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Pages">
+      <button type="button" role="tab" id="tab-l1" aria-selected="true">Line 1 <span class="sw" style="background:var(--blue)"></span></button>
+      <button type="button" role="tab" id="tab-l2" aria-selected="false">Line 2 <span class="sw" style="background:var(--green)"></span></button>
+      <button type="button" role="tab" id="tab-voice" aria-selected="false">Voice</button>
+      <button type="button" role="tab" id="tab-mod" aria-selected="false">Modulation <span class="led" id="modLed" aria-hidden="true"></span></button>
+    </div>
+    <div class="page" id="page-l1" role="tabpanel"></div>
+    <div class="page" id="page-l2" role="tabpanel" hidden></div>
+    <div class="page" id="page-voice" role="tabpanel" hidden>
+      <div class="rows">
+        <fieldset><legend><span class="dot"></span>Lines</legend><div class="knobs" id="g-lines"></div></fieldset>
+        <fieldset><legend><span class="dot"></span>Voice</legend><div class="knobs" id="g-voice"></div></fieldset>
+        <fieldset><legend><span class="dot"></span>Output</legend><div class="knobs" id="g-out"></div></fieldset>
+      </div>
+    </div>
+    <div class="page" id="page-mod" role="tabpanel" hidden>
+      <div class="mods" id="mods"></div>
+      <div class="modnote">Each source adds its depth to up to two destinations, in knob travel (Pitch: ±12 semitones at full depth). A destination is on both lines, line 1 or line 2. LFOs and mod envelopes run per voice.</div>
+    </div>
+
+    <fieldset class="extras">
+      <legend><span class="dot" style="background:#fff;box-shadow:0 0 0 1px #6e6e78 inset"></span>Bench only: test presets</legend>
+      <div class="prow">
+        <label for="presetSel" style="font-weight:700">Test preset</label>
+        <select id="presetSel"></select>
+        <button class="gel small" id="presetLoad" type="button">Load</button>
+        <button class="gel grey small" id="presetPlay" type="button">Load and play</button>
+        <button class="gel grey small" id="resetAll" type="button">Reset to defaults</button>
+      </div>
+      <div class="note" id="presetAbout" style="margin-top:6px"></div>
+      <div class="note" style="margin-top:4px">Load and play plays the preset's own phrase, as in its WAV. Test presets stay out of the plugin build.</div>
+    </fieldset>
+
+    <div class="play">
+      <div class="sliders">
+        <div class="bend"><span>Bend</span><input type="range" id="bend" min="-1" max="1" step="0.001" value="0" aria-label="Pitch bend, springs back"></div>
+        <div class="bend"><span>Wheel</span><input type="range" id="wheel" min="0" max="1" step="0.001" value="0" aria-label="Mod wheel"></div>
+        <div class="bend" title="Aftertouch. Springs back."><span>Press</span><input type="range" id="press" min="0" max="1" step="0.001" value="0" aria-label="Aftertouch, springs back"></div>
+      </div>
+      <div class="kbd"><div class="keys" id="keys"></div></div>
+    </div>
+    <div class="foot">
+      <label>Tempo (for synced LFOs) <input type="number" id="tempo" min="40" max="240" value="120" style="width:64px"> BPM</label>
+      <span>Latency 32 samples · 4× oversampled</span>
+      <button class="gel grey sp" id="panic" type="button">All notes off</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<script type="text/plain" id="dsp">
+/*__DSP__*/
+</script>
+<script>
+/*__PARAMS__*/
+</script>
+<script>
+/*__PRESETS__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const X = window.PRETZEL, PTAB = {};
+  for (const d of X.PARAMS) PTAB[d.id] = d;
+  const NH = X.NH;
+  /* ---------- formats ---------- */
+  const pct = v => Math.round(v * 100) + '%';
+  const spct = v => (v > 0.0049 ? '+' : v < -0.0049 ? '−' : '') + Math.round(Math.abs(v) * 100) + '%';
+  const sgn = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d || 0);
+  const secs = v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s';
+  const dB = v => v <= -47.9 ? 'Off' : sgn(v, 1) + ' dB';
+  const hzF = f => f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : f.toFixed(f < 100 ? 1 : 0) + ' Hz';
+  const SHORT_WAVES = ['Saw', 'Square', 'Pulse', 'Dbl sine', 'Saw-pulse', 'Reso', 'Dbl pulse'];
+  const SHORT_WIN = ['None', 'Saw', 'Tri', 'Trap', 'Pulse', 'Dbl saw'];
+  const BEAT_NAMES = ['1/32', '1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar', '2 bars', '4 bars'];
+  const DEST_NAMES = { pitch: 'Pitch', level: 'Level', detune: 'Detune', warp: 'Warp', vecx: 'Vector x', vecy: 'Vector y', ratio: 'Sync ratio', shape: 'Shape', bias: 'Bias', tilt: 'Tilt', oddeven: 'Odd/Even', morph: 'Drawn morph', ordermorph: 'Order morph', twist: 'Twist' };
+  const DEST_OPTS = ['None'];
+  for (const id of X.DEST_IDS) for (const w of ['both lines', 'line 1', 'line 2']) DEST_OPTS.push(DEST_NAMES[id] + ' · ' + w);
+
+  /* ---------- control specs ---------- */
+  const SPECS = [];
+  const add = (g, id, o) => SPECS.push(Object.assign({ type: 'knob', g, id }, o));
+  function lineSpecs(L) {
+    const g = n => 'g' + L + '-' + n, q = id => id + L;
+    add(g('pitch'), q('level'), { name: 'Level', fmt: dB });
+    add(g('pitch'), q('octave'), { name: 'Octave', fmt: v => sgn(v) });
+    add(g('pitch'), q('fifth'), { type: 'seg', name: 'Fifth', opts: ['Off', '+7'] });
+    add(g('pitch'), q('detune'), { name: 'Detune', fmt: v => sgn(v, 1) + ' ct' });
+    add(g('pitch'), q('penvdepth'), { name: 'Pitch env', long: 'Pitch envelope depth', fmt: v => sgn(v, 1) + ' st' });
+    add(g('pitch'), q('velamp'), { name: 'Vel → amp', fmt: pct });
+    add(g('warp'), q('wfamily'), { type: 'seg', name: 'Family', opts: X.FAMILIES });
+    add(g('warp'), q('warp'), { name: 'Warp', big: true, fmt: pct });
+    add(g('warp'), q('wenvdepth'), { name: 'Env', long: 'Warp envelope depth', fmt: spct });
+    add(g('warp'), q('warpkey'), { name: 'Key', long: 'Warp key follow', fmt: pct });
+    add(g('warp'), q('velwarp'), { name: 'Vel', long: 'Velocity to Warp', fmt: pct });
+    add(g('warpcz'), q('wave'), { type: 'seg', name: 'Wave', opts: SHORT_WAVES });
+    add(g('warpcz'), q('pair'), { type: 'select', name: 'Pair (odd cycles)', opts: ['None'].concat(X.WAVES) });
+    add(g('warpwin'), q('window'), { type: 'seg', name: 'Window', opts: SHORT_WIN });
+    add(g('warpvec'), q('curve'), { type: 'seg', name: 'Curve', opts: ['Power', 'Sigmoid', 'Bezier'] });
+    add(g('warpvec'), q('vecx'), { name: 'Point x', long: 'Vector x (Bezier handle x) at Warp 1', fmt: v => v.toFixed(2) });
+    add(g('warpvec'), q('vecy'), { name: 'Point y', long: 'Vector y (Bezier handle y × 4) at Warp 1', fmt: v => v.toFixed(2) });
+    add(g('warpvec'), q('ratio'), { name: 'Ratio', long: 'Sync ratio at Warp 1', fmt: v => '×' + v.toFixed(2) });
+    add(g('shape'), q('sfamily'), { type: 'seg', name: 'Shaper', opts: X.SHAPERS });
+    add(g('shape'), q('shape'), { name: 'Shape', big: true, fmt: pct });
+    add(g('shape'), q('senvdepth'), { name: 'Env', long: 'Shape envelope depth', fmt: spct });
+    add(g('shape'), q('link'), { name: 'Link', long: 'The Warp envelope also drives Shape', fmt: spct });
+    add(g('shape'), q('bias'), { name: 'Bias', fmt: spct });
+    add(g('shape'), q('shapekey'), { name: 'Key', long: 'Shape key follow', fmt: pct });
+    add(g('shape'), q('velshape'), { name: 'Vel', long: 'Velocity to Shape', fmt: pct });
+    add(g('cheb'), q('tilt'), { name: 'Tilt', fmt: spct });
+    add(g('cheb'), q('oddeven'), { name: 'Odd/Even', fmt: v => Math.abs(v) < 0.005 ? 'Both' : (v > 0 ? 'Cut even ' : 'Cut odd ') + pct(Math.abs(v)) });
+    add(g('fold'), q('fold'), { type: 'seg', name: 'Fold', opts: X.FOLDS });
+    add(g('sat'), q('sat'), { type: 'seg', name: 'Curve', opts: X.SATS });
+    add(g('drawn'), q('keys'), { type: 'seg', name: 'Keyframes', opts: ['2', '3', '4'], off: 2 });
+    add(g('drawn'), q('morph'), { name: 'Morph', fmt: pct });
+    add(g('order'), q('order'), { type: 'seg', name: 'Order', opts: ['Warp → Shape', 'Shape → Warp', 'Morph'] });
+    add(g('order'), q('ordermorph'), { name: 'Morph', long: 'Order morph: 0 Warp → Shape, 1 Shape → Warp', fmt: pct });
+    add(g('order'), q('swmode'), { type: 'seg', name: 'Shape → Warp', opts: ['Read', 'Bend'] });
+    add(g('order'), q('morphway'), { type: 'seg', name: 'Morph way', opts: ['Through the warp', 'Shared'] });
+    add(g('order'), q('twist'), { name: 'Twist', big: true, fmt: v => v < 0.005 ? 'Off' : pct(v) + (v > 0.75 ? ' · chaos' : '') });
+  }
+  lineSpecs(1); lineSpecs(2);
+  add('g-lines', 'lines', { type: 'seg', name: 'Lines', opts: ['1', '2', '1 + 1′', '1 + 2'] });
+  add('g-lines', 'ring', { type: 'seg', name: 'Ring', opts: ['Off', 'On'] });
+  add('g-lines', 'noise', { type: 'seg', name: 'Noise (line 2)', opts: ['Off', 'On'] });
+  add('g-voice', 'mode', { type: 'seg', name: 'Voices', opts: ['Mono', 'Poly'] });
+  add('g-voice', 'glide', { name: 'Glide', fmt: v => v < 0.0005 ? 'Off' : secs(v) });
+  add('g-voice', 'benchvoices', { type: 'seg', name: 'Bench poly voices', opts: ['2', '4', '8'], def: 1, bench: true, long: 'How many voices the browser plays in Poly. The JavaScript engine is heavy; the plugin\'s count is set with the C++ port.' });
+  add('g-out', 'transpose', { name: 'Transpose', fmt: v => sgn(v) + ' st' });
+  add('g-out', 'bendrange', { name: 'Bend range', fmt: v => '±' + v + ' st' });
+  add('g-out', 'volume', { name: 'Volume', big: true, fmt: dB });
+  for (const n of [1, 2]) {
+    const g = 'g-lfo' + n, b = 'lfo' + n;
+    add(g, b + 'shape', { type: 'seg', name: 'Shape', opts: X.LFO_SHAPES });
+    add(g, b + 'rate', { name: 'Rate', fmt: v => v < 1 ? v.toFixed(2) + ' Hz' : v < 10 ? v.toFixed(1) + ' Hz' : Math.round(v) + ' Hz' });
+    add(g, b + 'sync', { type: 'seg', name: 'Rate is', opts: ['Free', 'Tempo'] });
+    add(g, b + 'div', { type: 'select', name: 'Cycle', opts: BEAT_NAMES });
+    add(g, b + 'retrig', { type: 'seg', name: 'Restart', opts: ['Free', 'On note'] });
+  }
+  for (const s of ['lfo1', 'lfo2', 'menv1', 'menv2']) for (const j of [1, 2]) {
+    add('g-' + s + 'd' + j, s + 'dest' + j, { type: 'select', name: 'Destination ' + j, opts: DEST_OPTS });
+    add('g-' + s + 'd' + j, s + 'depth' + j, { name: 'Depth', fmt: spct });
+  }
+  for (const s of ['wheel', 'at']) {
+    add('g-' + s, s + 'dest', { type: 'select', name: 'Destination', opts: DEST_OPTS });
+    add('g-' + s, s + 'depth', { name: 'Depth', fmt: spct });
+  }
+  for (const s of SPECS) { const d = PTAB[s.id]; if (d) { for (const k of ['min', 'max', 'def', 'step', 'log', 'curve']) if (s[k] === undefined && d[k] !== undefined) s[k] = d[k]; } }
+  // every engine parameter has a control: a knob, a switch, or an envelope, harmonic or keyframe editor
+  const covered = id => SPECS.some(s => s.id === id) || /^(aenv|wenv|senv|penv|menv)\d(t|l)\d$|^(aenv|wenv|senv|penv|menv)\d(sus|end)$|^h\d+_\d$/.test(id);
+  for (const d of X.PARAMS) if (!covered(d.id)) console.warn('no control for', d.id);
+
+  /* ---------- the line pages ---------- */
+  for (const L of [1, 2]) {
+    const page = document.getElementById('page-l' + L), dot = L === 1 ? 'dot' : 'dot g';
+    page.innerHTML =
+      '<div class="rows">' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Warp (phase distortion)</legend><div class="knobs" id="g' + L + '-warp"></div>' +
+        '<div class="part" id="g' + L + '-warpcz"></div><div class="part" id="g' + L + '-warpvec"></div><div class="part" id="g' + L + '-warpwin"></div></fieldset>' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Shape (waveshaping)</legend><div class="knobs" id="g' + L + '-shape"></div>' +
+        '<div class="part" id="g' + L + '-cheb"><div class="edit bars wide"><canvas id="bars' + L + '" aria-label="Chebyshev harmonics 1 to 16: drag to set"></canvas><div class="row">Harmonics 1–16 · drag to draw<span class="ro" id="barsRo' + L + '"></span></div></div></div>' +
+        '<div class="part" id="g' + L + '-fold"></div><div class="part" id="g' + L + '-sat"></div>' +
+        '<div class="part" id="g' + L + '-drawn"><div class="frames" id="frames' + L + '"></div></div></fieldset>' +
+      '<fieldset><legend><span class="' + dot + '"></span>Order and Twist</legend><div class="knobs" id="g' + L + '-order"></div></fieldset>' +
+      '<fieldset><legend><span class="' + dot + '"></span>Pitch and level</legend><div class="knobs" id="g' + L + '-pitch"></div></fieldset>' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Envelopes</legend><div id="env' + L + '"></div></fieldset>' +
+      '</div>';
+  }
+  {
+    const host = document.getElementById('mods');
+    const box = (title, inner) => { const f = document.createElement('fieldset'); f.innerHTML = '<legend><span class="dot"></span>' + title + '</legend>' + inner; host.appendChild(f); };
+    for (const n of [1, 2]) box('LFO ' + n, '<div class="knobs" id="g-lfo' + n + '"></div><div class="part" id="g-lfo' + n + 'd1"></div><div class="part" id="g-lfo' + n + 'd2"></div>');
+    for (const n of [1, 2]) box('Mod envelope ' + n, '<div id="menvEd' + n + '"></div><div class="part" id="g-menv' + n + 'd1"></div><div class="part" id="g-menv' + n + 'd2"></div>');
+    box('Mod wheel', '<div class="knobs" id="g-wheel"></div>');
+    box('Aftertouch', '<div class="knobs" id="g-at"></div>');
+  }
+
+  /* ---------- audio ---------- */
+  let ctx = null, node = null, analyser = null, ready = false, starting = null;
+  const state = {};
+  const queue = [];
+  function send(msg) { if (ready) node.port.postMessage(msg); else queue.push(msg); }
+  function showError(t) { const e = document.getElementById('err'); e.style.display = 'block'; e.textContent = t; }
+  function allParams() { const all = {}; for (const d of X.PARAMS) all[d.id] = state[d.id]; return all; }
+  function start() {
+    if (starting) return starting;
+    starting = (async () => {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC({ latencyHint: 'interactive' });
+        if (!ctx.audioWorklet) throw new Error('This browser has no AudioWorklet support. Try a current Chrome, Edge, Firefox or Safari.');
+        const src = document.getElementById('dsp').textContent;
+        const blobUrl = () => URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+        const dataUrl = () => 'data:application/javascript;charset=utf-8,' + encodeURIComponent(src);
+        const tries = location.protocol === 'file:' ? [dataUrl, blobUrl] : [blobUrl, dataUrl];
+        let loaded = false, lastErr = null;
+        for (const mk of tries) { try { await ctx.audioWorklet.addModule(mk()); loaded = true; break; } catch (err) { lastErr = err; } }
+        if (!loaded) throw lastErr;
+        node = new AudioWorkletNode(ctx, 'pretzel-processor', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+        analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
+        analyser.minDecibels = -105; analyser.maxDecibels = -20;
+        node.connect(ctx.destination); node.connect(analyser);
+        node.port.onmessage = onMsg;
+        node.onprocessorerror = () => showError('The audio engine stopped with an error. Reload the page.');
+        ready = true;
+        node.port.postMessage({ t: 'many', p: allParams() });
+        node.port.postMessage({ t: 'tempo', v: tempoNow() });
+        node.port.postMessage({ t: 'voices', n: [2, 4, 8][state.benchvoices] });
+        for (const L of [1, 2]) for (let k = 0; k < 4; k++) if (frames[L][k].changed) sendCurve(L, k);
+        while (queue.length) node.port.postMessage(queue.shift());
+        if (ctx.state !== 'running') await ctx.resume();
+        document.getElementById('power').classList.add('hide');
+      } catch (err) { showError('Audio could not start: ' + (err && err.message || err)); starting = null; }
+    })();
+    return starting;
+  }
+  document.getElementById('powerBtn').addEventListener('click', start);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) allOff(); });
+
+  /* ---------- knobs and switches ---------- */
+  const ctl = {};
+  function toNorm(s, v) {
+    if (s.log) return Math.log(v / s.min) / Math.log(s.max / s.min);
+    const x = Math.min(1, Math.max(0, (v - s.min) / (s.max - s.min)));
+    return s.curve ? Math.pow(x, 1 / s.curve) : x;
+  }
+  function fromNorm(s, n) {
+    n = Math.min(1, Math.max(0, n));
+    let v = s.log ? s.min * Math.pow(s.max / s.min, n) : s.min + (s.max - s.min) * (s.curve ? Math.pow(n, s.curve) : n);
+    if (s.step) v = Math.round(v / s.step) * s.step;
+    return v;
+  }
+  function makeKnob(s, host) {
+    const el = document.createElement('div');
+    el.className = 'knob' + (s.big ? ' big' : '');
+    el.innerHTML = '<div class="dial" tabindex="0" role="slider"><div class="cap"></div><div class="ptr"></div></div><span class="name"></span><span class="val"></span>';
+    const dial = el.firstChild, valEl = el.children[2];
+    el.children[1].textContent = s.name;
+    if (s.long) el.title = s.long;
+    dial.setAttribute('aria-label', s.long || s.name);
+    host.appendChild(el);
+    const zero = s.min < 0 && s.max > 0 ? toNorm(s, 0) : 0;
+    const k = { s, el, norm: toNorm(s, s.def) };
+    k.set = (n, quiet) => {
+      k.norm = Math.min(1, Math.max(0, n));
+      const v = fromNorm(s, k.norm);
+      if (s.step) k.norm = toNorm(s, v);
+      state[s.id] = v;
+      dial.style.setProperty('--a0', (Math.min(zero, k.norm) * 270) + 'deg');
+      dial.style.setProperty('--a1', (Math.max(zero, k.norm) * 270) + 'deg');
+      dial.querySelector('.ptr').style.transform = 'rotate(' + (-135 + k.norm * 270) + 'deg)';
+      const txt = s.fmt(v);
+      valEl.textContent = txt;
+      dial.setAttribute('aria-valuetext', txt);
+      if (!quiet) send({ t: 'p', id: s.id, v });
+      changed();
+    };
+    let dragY = null, startN = 0;
+    dial.addEventListener('pointerdown', e => { dial.setPointerCapture(e.pointerId); dragY = e.clientY; startN = k.norm; dial.focus(); e.preventDefault(); });
+    dial.addEventListener('pointermove', e => {
+      if (dragY === null) return;
+      const r = startN + (dragY - e.clientY) * (e.shiftKey ? 0.0008 : 0.005);
+      k.set(r);
+      if (e.shiftKey) { dragY = e.clientY; startN = r; }
+    });
+    const end = () => { dragY = null; };
+    dial.addEventListener('pointerup', end); dial.addEventListener('pointercancel', end);
+    dial.addEventListener('dblclick', () => k.set(toNorm(s, s.def)));
+    dial.addEventListener('wheel', e => { e.preventDefault(); k.set(k.norm - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)); }, { passive: false });
+    dial.addEventListener('keydown', e => {
+      const st = s.step ? 1 / ((s.max - s.min) / s.step) : (e.shiftKey ? 0.005 : 0.02);
+      let used = true;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') k.set(k.norm + st);
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') k.set(k.norm - st);
+      else if (e.key === 'Home') k.set(0);
+      else if (e.key === 'End') k.set(1);
+      else used = false;
+      if (used) { e.preventDefault(); e.stopPropagation(); }
+    });
+    k.setValue = (v, quiet) => k.set(toNorm(s, v), quiet);
+    k.set(k.norm, true);
+    ctl[s.id] = k;
+  }
+  // a switch: button i is value i + off (Keyframes 2–4 are buttons 0–2)
+  function makeSeg(s, host) {
+    const off = s.off || 0;
+    const w = document.createElement('div'); w.className = 'segwrap';
+    w.innerHTML = '<span></span><div class="seg" role="group"></div>';
+    w.firstChild.textContent = s.name;
+    if (s.long) w.title = s.long;
+    const seg = w.lastChild; seg.setAttribute('aria-label', s.name);
+    const btns = s.opts.map((o, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = o; b.dataset.v = i + off; seg.appendChild(b); return b; });
+    host.appendChild(w);
+    const g = { s, el: w };
+    g.setValue = (v, quiet) => {
+      v = Math.round(v); state[s.id] = v;
+      btns.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === v)));
+      if (!quiet) {
+        if (s.bench) { allOff(); send({ t: 'voices', n: [2, 4, 8][v] }); }
+        else send({ t: 'p', id: s.id, v });
+        if (s.id === 'mode') releaseKeys();
+      }
+      changed();
+    };
+    btns.forEach(b => b.addEventListener('click', () => g.setValue(+b.dataset.v)));
+    g.setValue(s.def, true);
+    ctl[s.id] = g;
+  }
+  function makeSelect(s, host) {
+    const w = document.createElement('div'); w.className = 'segwrap';
+    w.innerHTML = '<span></span><select></select>';
+    w.firstChild.textContent = s.name;
+    const el = w.lastChild; el.setAttribute('aria-label', s.name);
+    s.opts.forEach((o, i) => { const op = document.createElement('option'); op.value = i; op.textContent = o; el.appendChild(op); });
+    el.addEventListener('keydown', e => e.stopPropagation());
+    host.appendChild(w);
+    const g = { s, el: w };
+    g.setValue = (v, quiet) => {
+      v = Math.round(v); state[s.id] = v; el.value = String(v);
+      if (!quiet) send({ t: 'p', id: s.id, v });
+      changed();
+    };
+    el.addEventListener('change', () => g.setValue(+el.value));
+    g.setValue(s.def, true);
+    ctl[s.id] = g;
+  }
+  let built = false;
+  for (const d of X.PARAMS) state[d.id] = d.def;
+  for (const s of SPECS) {
+    const host = document.getElementById(s.g);
+    if (!host) { console.warn('no group', s.g); continue; }
+    if (s.type === 'knob') makeKnob(s, host); else if (s.type === 'seg') makeSeg(s, host); else makeSelect(s, host);
+  }
+
+  /* ---------- canvas helpers ---------- */
+  function fit(c) {
+    const d = window.devicePixelRatio || 1, r = c.getBoundingClientRect();
+    const W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    return d;
+  }
+  const LCD = 'rgba(255,201,148,', ORANGE = '#f5821f', GREEN = '#61bb46';
+  const lineCol = L => L === 1 ? ORANGE : GREEN;
+  function dragOn(c, fn, end) {
+    let on = false;
+    const at = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e]; };
+    c.addEventListener('pointerdown', e => { on = true; c.setPointerCapture(e.pointerId); fn(...at(e), true); e.preventDefault(); });
+    c.addEventListener('pointermove', e => { if (on) fn(...at(e), false); });
+    const stop = () => { if (on) { on = false; if (end) end(); } };
+    c.addEventListener('pointerup', stop); c.addEventListener('pointercancel', stop);
+  }
+
+  /* ---------- envelope editors: eight stages, time and level each, a sustain point and an end ---------- */
+  const envEds = [];
+  const ENV_NAMES = { aenv: 'Amp', wenv: 'Warp', senv: 'Shape', penv: 'Pitch', menv: 'Mod' };
+  function makeEnvEditor(host, prefixes, col) {
+    const wrap = document.createElement('div'); wrap.className = 'edit';
+    wrap.innerHTML = '<div class="row"></div><canvas></canvas><div class="row"><label>Stages <select class="end"></select></label><label>Sustain at <select class="sus"></select></label><span class="ro"></span></div>';
+    host.appendChild(wrap);
+    const top = wrap.children[0], c = wrap.children[1], endSel = wrap.querySelector('.end'), susSel = wrap.querySelector('.sus'), ro = wrap.querySelector('.ro');
+    for (let i = 1; i <= 8; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; endSel.appendChild(o); }
+    for (let i = 0; i <= 8; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i ? 'stage ' + i : 'none'; susSel.appendChild(o); }
+    for (const s of [endSel, susSel]) s.addEventListener('keydown', e => e.stopPropagation());
+    const ed = { c, prefix: prefixes[0], col };
+    if (prefixes.length > 1) {
+      const seg = document.createElement('div'); seg.className = 'seg';
+      prefixes.forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.textContent = ENV_NAMES[p.replace(/\d$/, '')]; b.dataset.p = p; seg.appendChild(b); });
+      seg.addEventListener('click', e => { const p = e.target.dataset && e.target.dataset.p; if (p) { ed.prefix = p; ed.sync(); } });
+      top.appendChild(seg);
+      ed.seg = seg;
+    } else top.remove();
+    const T = s => PTAB[ed.prefix + 't' + s], tId = s => ed.prefix + 't' + s, lId = s => ed.prefix + 'l' + s;
+    const setP = (id, v) => { state[id] = v; send({ t: 'p', id, v }); changed(); };
+    endSel.addEventListener('change', () => setP(ed.prefix + 'end', +endSel.value));
+    susSel.addEventListener('change', () => setP(ed.prefix + 'sus', +susSel.value));
+    ed.sync = () => {
+      endSel.value = String(state[ed.prefix + 'end']); susSel.value = String(state[ed.prefix + 'sus']);
+      if (ed.seg) for (const b of ed.seg.children) b.setAttribute('aria-pressed', String(b.dataset.p === ed.prefix));
+      ed.draw();
+    };
+    // x: each stage takes its time's knob travel (time^⅓) of one slot; the slot fits the stages in use
+    const geom = () => {
+      const end = state[ed.prefix + 'end'], slot = 1 / Math.max(3, end);
+      const pts = [[0, 0]]; let x = 0;
+      for (let s = 1; s <= end; s++) { x += toNorm(T(s), state[tId(s)]) * slot; pts.push([x, state[lId(s)]]); }
+      return { end, slot, pts };
+    };
+    let hot = 0, sel = 0;
+    ed.draw = () => {
+      const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 8 * d;
+      const { end, pts } = geom(), sus = state[ed.prefix + 'sus'];
+      const px = u => pad + u * (W - 2 * pad), py = v => H - pad - v * (H - 2 * pad);
+      x.clearRect(0, 0, W, H);
+      x.fillStyle = LCD + '.1)'; x.fillRect(pad, py(0), W - 2 * pad, 1); x.fillRect(pad, py(1), W - 2 * pad, 1);
+      x.strokeStyle = ed.col; x.lineWidth = 1.8 * d; x.beginPath();
+      pts.forEach(([u, v], i) => i ? x.lineTo(px(u), py(v)) : x.moveTo(px(u), py(v))); x.stroke();
+      if (sus > 0 && sus <= end) { x.fillStyle = LCD + '.5)'; x.fillRect(px(pts[sus][0]), pad, 1 * d, H - 2 * pad); x.font = (9 * d) + 'px Monaco, monospace'; x.fillText('SUSTAIN', px(pts[sus][0]) + 4 * d, pad + 9 * d); }
+      for (let s = 1; s <= end; s++) {
+        x.fillStyle = s === sel ? '#fff' : ed.col; x.beginPath(); x.arc(px(pts[s][0]), py(pts[s][1]), (s === sel ? 4.5 : 3.5) * d, 0, 2 * Math.PI); x.fill();
+      }
+      const s = sel || 1;
+      ro.textContent = 'stage ' + s + ' · ' + secs(state[tId(s)]) + ' · level ' + pct(state[lId(s)]);
+    };
+    let grab = null;
+    dragOn(c, (u, v, e, first) => {
+      const pad = 8 / c.getBoundingClientRect().width, g = geom();
+      const uu = (u - pad) / (1 - 2 * pad), vv = 1 - (v - 0.06) / 0.88;
+      if (first) {
+        let best = 0, bd = 1e9;
+        for (let s = 1; s <= g.end; s++) { const dd = Math.hypot((g.pts[s][0] - uu) * 4, g.pts[s][1] - vv); if (dd < bd) { bd = dd; best = s; } }
+        sel = best; grab = { s: best, u0: uu, n0: toNorm(T(best), state[tId(best)]) };
+      }
+      if (!grab) return;
+      const s = grab.s;
+      const n = Math.min(1, Math.max(0, grab.n0 + (uu - grab.u0) / g.slot));
+      setP(tId(s), fromNorm(T(s), n));
+      setP(lId(s), Math.min(1, Math.max(0, vv)));
+      ed.draw();
+    }, () => { grab = null; });
+    envEds.push(ed);
+    ed.sync();
+    return ed;
+  }
+  for (const L of [1, 2]) makeEnvEditor(document.getElementById('env' + L), ['aenv' + L, 'wenv' + L, 'senv' + L, 'penv' + L], lineCol(L));
+  for (const n of [1, 2]) makeEnvEditor(document.getElementById('menvEd' + n), ['menv' + n], ORANGE);
+
+  /* ---------- Chebyshev harmonics ---------- */
+  const barEds = {};
+  for (const L of [1, 2]) {
+    const c = document.getElementById('bars' + L), ro = document.getElementById('barsRo' + L);
+    const id = k => 'h' + k + '_' + L;
+    const draw = () => {
+      const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 6 * d, bw = (W - 2 * pad) / NH;
+      x.clearRect(0, 0, W, H);
+      for (let k = 1; k <= NH; k++) {
+        const v = state[id(k)], h = v * (H - 2 * pad - 10 * d);
+        x.fillStyle = v > 0 ? lineCol(L) : LCD + '.15)';
+        x.fillRect(pad + (k - 1) * bw + 2 * d, H - pad - 10 * d - Math.max(h, 1 * d), bw - 4 * d, Math.max(h, 1 * d));
+        x.fillStyle = LCD + '.6)'; x.font = (8 * d) + 'px Monaco, monospace'; x.textAlign = 'center';
+        x.fillText(String(k), pad + (k - 0.5) * bw, H - pad);
+      }
+    };
+    let last = null;
+    dragOn(c, (u, v, e, first) => {
+      const k = Math.min(NH, Math.max(1, Math.floor(u * NH) + 1)), val = Math.round(Math.min(1, Math.max(0, 1 - (v - 0.07) / 0.78)) * 100) / 100;
+      const from = first || last === null ? k : last;
+      for (let j = Math.min(from, k); j <= Math.max(from, k); j++) { state[id(j)] = val; send({ t: 'p', id: id(j), v: val }); }
+      last = k; ro.textContent = 'harmonic ' + k + ' · ' + pct(val); draw();
+    }, () => { last = null; });
+    barEds[L] = draw;
+  }
+
+  /* ---------- drawn keyframes ---------- */
+  const frames = { 1: [], 2: [] };
+  function sendCurve(L, k) { const f = frames[L][k]; send({ t: 'curve', line: L, key: k, pts: f.y.map((y, i) => [-1 + 2 * i / 32, y]) }); }
+  for (const L of [1, 2]) {
+    const host = document.getElementById('frames' + L);
+    for (let k = 0; k < 4; k++) {
+      const w = document.createElement('div'); w.className = 'f';
+      w.innerHTML = '<canvas aria-label="Drawn keyframe ' + (k + 1) + ': drag to draw, double-click to restore"></canvas><span>Key ' + (k + 1) + '</span>';
+      host.appendChild(w);
+      const c = w.firstChild, f = { c, el: w, y: X.CURVES[k].slice(), changed: false };
+      f.draw = () => {
+        const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d');
+        x.clearRect(0, 0, W, H);
+        x.fillStyle = LCD + '.12)'; x.fillRect(0, H / 2, W, 1); x.fillRect(W / 2, 0, 1, H);
+        x.strokeStyle = LCD + '.18)'; x.beginPath(); x.moveTo(0, H); x.lineTo(W, 0); x.stroke();
+        x.strokeStyle = lineCol(L); x.lineWidth = 1.6 * d; x.beginPath();
+        f.y.forEach((y, i) => { const px = i / 32 * W, py = H / 2 - y * H * 0.46; i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.stroke();
+      };
+      let last = -1, timer = 0;
+      dragOn(c, (u, v, e, first) => {
+        const i = Math.min(32, Math.max(0, Math.round(u * 32))), y = Math.min(1, Math.max(-1, (0.5 - v) / 0.46));
+        const a = first || last < 0 ? i : last;
+        for (let j = Math.min(a, i); j <= Math.max(a, i); j++) f.y[j] = a === i ? y : f.y[a] + (y - f.y[a]) * (j - a) / (i - a);
+        f.y[i] = y; last = i; f.changed = true; f.draw();
+        if (!timer) timer = setTimeout(() => { timer = 0; sendCurve(L, k); }, 40);
+      }, () => { last = -1; sendCurve(L, k); });
+      c.addEventListener('dblclick', () => { f.y = X.CURVES[k].slice(); f.changed = false; f.draw(); sendCurve(L, k); });
+      frames[L].push(f);
+    }
+  }
+  function resetCurves() { for (const L of [1, 2]) for (let k = 0; k < 4; k++) { const f = frames[L][k]; if (f.changed) { f.y = X.CURVES[k].slice(); f.changed = false; sendCurve(L, k); } f.draw(); } }
+
+  /* ---------- pages ---------- */
+  const PAGES = ['l1', 'l2', 'voice', 'mod'];
+  function showPage(p) {
+    for (const q of PAGES) { document.getElementById('tab-' + q).setAttribute('aria-selected', String(q === p)); document.getElementById('page-' + q).hidden = q !== p; }
+    redrawEditors();
+  }
+  for (const p of PAGES) document.getElementById('tab-' + p).addEventListener('click', () => showPage(p));
+  function redrawEditors() { for (const e of envEds) e.draw(); for (const L of [1, 2]) { barEds[L](); for (const f of frames[L]) f.draw(); } }
+
+  /* ---------- what applies when ---------- */
+  function dim(id, off, why) {
+    const t = ctl[id]; if (!t) return;
+    t.el.classList.toggle('dim', off); t.el.title = off ? why : (t.s.long || '');
+  }
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.hidden = !on; };
+  function changed() {
+    if (!built) return;
+    const sel = state.lines;
+    for (const L of [1, 2]) {
+      const fam = state['wfamily' + L], sf = state['sfamily' + L], ord = state['order' + L];
+      show('g' + L + '-warpcz', fam === 0);
+      show('g' + L + '-warpvec', fam > 0);
+      for (const id of ['curve', 'vecx', 'vecy', 'ratio']) ctl[id + L].el.hidden = true;
+      if (fam === 1) { ctl['vecx' + L].el.hidden = false; ctl['vecy' + L].el.hidden = false; }
+      if (fam === 2) { ctl['curve' + L].el.hidden = false; if (state['curve' + L] === 2) { ctl['vecx' + L].el.hidden = false; ctl['vecy' + L].el.hidden = false; } }
+      if (fam === 3) ctl['ratio' + L].el.hidden = false;
+      show('g' + L + '-cheb', sf === 0); show('g' + L + '-fold', sf === 1); show('g' + L + '-sat', sf === 2); show('g' + L + '-drawn', sf === 3);
+      frames[L].forEach((f, k) => f.el.classList.toggle('dim', k >= state['keys' + L]));
+      dim('ordermorph' + L, ord !== 2, 'Works when Order is Morph');
+      dim('morphway' + L, ord !== 2, 'Works when Order is Morph');
+      dim('swmode' + L, ord === 0, 'Works when the shaper is on the phase (Shape → Warp or Morph)');
+    }
+    // line 2 in 1 + 1′ plays line 1's settings, with its own octave, fifth and detune
+    const twin = sel === 2;
+    for (const s of SPECS) if (/2$/.test(s.id) && s.g.startsWith('g2-') && !/^(octave|fifth|detune)2$/.test(s.id)) dim(s.id, sel === 0 || twin, sel === 0 ? 'Line 2 is off (Lines: 1)' : 'In 1 + 1′ line 2 plays line 1\'s settings, with its own octave, fifth and detune');
+    dim('octave2', sel === 0, 'Line 2 is off (Lines: 1)'); dim('fifth2', sel === 0, 'Line 2 is off (Lines: 1)'); dim('detune2', sel === 0, 'Line 2 is off (Lines: 1)');
+    for (const id of ['octave1', 'fifth1', 'detune1', 'level1']) dim(id, sel === 1, 'Line 1 is off (Lines: 2)');
+    dim('ring', sel < 2, 'Ring needs both lines');
+    dim('noise', sel === 0, 'Noise is on line 2');
+    dim('glide', state.mode === 1, 'Glide works in Mono');
+    dim('benchvoices', state.mode === 0, 'Mono plays one voice');
+    for (const n of [1, 2]) { dim('lfo' + n + 'rate', state['lfo' + n + 'sync'] === 1, 'The rate follows the tempo'); dim('lfo' + n + 'div', state['lfo' + n + 'sync'] === 0, 'Works when the rate follows the tempo'); }
+    for (const s of ['lfo1', 'lfo2', 'menv1', 'menv2']) for (const j of [1, 2]) dim(s + 'depth' + j, !state[s + 'dest' + j], 'Pick a destination');
+    for (const s of ['wheel', 'at']) dim(s + 'depth', !state[s + 'dest'], 'Pick a destination');
+    let any = false; for (const id of ['lfo1dest1', 'lfo1dest2', 'lfo2dest1', 'lfo2dest2', 'menv1dest1', 'menv1dest2', 'menv2dest1', 'menv2dest2', 'wheeldest', 'atdest']) if (state[id]) any = true;
+    document.getElementById('modLed').classList.toggle('on', any);
+    // editors that just appeared were sized while hidden
+    if (!redrawSoon) { redrawSoon = true; requestAnimationFrame(() => { redrawSoon = false; redrawEditors(); }); }
+  }
+  let redrawSoon = false;
+  built = true; changed();
+
+  function setValue(id, v, quiet) {
+    if (ctl[id]) ctl[id].setValue(v, quiet);
+    else state[id] = v;
+  }
+  function resetAll() {
+    for (const d of X.PARAMS) setValue(d.id, d.def, true);
+    send({ t: 'many', p: allParams() });
+    resetCurves();
+    for (const e of envEds) e.sync();
+    barEds[1](); barEds[2]();
+  }
+  document.getElementById('resetAll').addEventListener('click', () => { allOff(); resetAll(); });
+
+  /* ---------- test presets ---------- */
+  const PRESETS = window.PretzelPresets || [];
+  const sel = document.getElementById('presetSel'), about = document.getElementById('presetAbout');
+  PRESETS.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; sel.appendChild(o); });
+  sel.addEventListener('keydown', e => e.stopPropagation());
+  const showAbout = () => { const pr = PRESETS[+sel.value]; about.textContent = pr ? pr.about || '' : ''; };
+  sel.addEventListener('change', showAbout); showAbout();
+  function loadPreset() {
+    const pr = PRESETS[+sel.value]; if (!pr) return null;
+    allOff(); resetAll();
+    for (const k in pr.params) setValue(k, pr.params[k], true);
+    send({ t: 'many', p: allParams() });
+    for (const e of envEds) e.sync();
+    barEds[1](); barEds[2]();
+    return pr;
+  }
+  document.getElementById('presetLoad').addEventListener('click', loadPreset);
+  document.getElementById('presetPlay').addEventListener('click', async () => {
+    await start();
+    const pr = loadPreset(); if (!pr) return;
+    send({ t: 'play', pr: { phrase: pr.phrase, steps: pr.steps || [], sweeps: pr.sweeps || [] } });
+  });
+
+  /* ---------- bend, wheel, aftertouch, tempo ---------- */
+  const bendEl = document.getElementById('bend'), roBend = document.getElementById('roBend');
+  const sendBend = () => { send({ t: 'bend', v: +bendEl.value }); roBend.textContent = sgn(+bendEl.value * state.bendrange, 2) + ' st'; };
+  bendEl.addEventListener('input', sendBend);
+  const springBack = () => { bendEl.value = 0; sendBend(); };
+  bendEl.addEventListener('pointerup', springBack); bendEl.addEventListener('pointercancel', springBack);
+  const wheelEl = document.getElementById('wheel'), pressEl = document.getElementById('press');
+  wheelEl.addEventListener('input', () => send({ t: 'wheel', v: +wheelEl.value }));
+  pressEl.addEventListener('input', () => send({ t: 'press', v: +pressEl.value }));
+  const pressBack = () => { pressEl.value = 0; send({ t: 'press', v: 0 }); };
+  pressEl.addEventListener('pointerup', pressBack); pressEl.addEventListener('pointercancel', pressBack);
+  for (const el of [bendEl, wheelEl, pressEl]) el.addEventListener('keydown', e => e.stopPropagation());
+  bendEl.addEventListener('keyup', e => { e.stopPropagation(); springBack(); });
+  pressEl.addEventListener('keyup', e => { e.stopPropagation(); pressBack(); });
+  wheelEl.addEventListener('keyup', e => e.stopPropagation());
+  const tempoEl = document.getElementById('tempo');
+  const tempoNow = () => +tempoEl.value || 120;
+  tempoEl.addEventListener('change', () => send({ t: 'tempo', v: tempoNow() }));
+  tempoEl.addEventListener('keydown', e => e.stopPropagation());
+
+  /* ---------- PC keyboard as a MIDI keyboard (Ableton layout) ---------- */
+  const KEYMAP = { KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11,
+                   KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16 };
+  const KEYCAP = { KeyA: 'A', KeyW: 'W', KeyS: 'S', KeyE: 'E', KeyD: 'D', KeyF: 'F', KeyT: 'T', KeyG: 'G', KeyY: 'Y', KeyH: 'H', KeyU: 'U', KeyJ: 'J',
+                   KeyK: 'K', KeyO: 'O', KeyL: 'L', KeyP: 'P', Semicolon: ';' };
+  const VELS = [1, 20, 40, 60, 80, 100, 127];
+  let octave = 2, velIdx = 5;                 // Ableton naming: C3 = MIDI 60; starts at C2
+  const down = new Map(), sounding = new Map();
+  const noteName = m => ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][m % 12] + (Math.floor(m / 12) - 2);
+  function baseNote() { return (octave + 2) * 12; }
+  function noteOn(srcKey, midi) {
+    if (down.has(srcKey) || midi < 0 || midi > 127) return;
+    start();
+    down.set(srcKey, midi);
+    sounding.set(midi, (sounding.get(midi) || 0) + 1);
+    send({ t: 'on', n: midi, v: VELS[velIdx] });
+    paintKeys();
+  }
+  function noteOff(srcKey) {
+    if (!down.has(srcKey)) return;
+    const midi = down.get(srcKey); down.delete(srcKey);
+    const c = (sounding.get(midi) || 1) - 1;
+    if (c <= 0) { sounding.delete(midi); send({ t: 'off', n: midi }); } else sounding.set(midi, c);
+    paintKeys();
+  }
+  function releaseKeys() { down.clear(); sounding.clear(); paintKeys(); }
+  function allOff() { releaseKeys(); send({ t: 'panic' }); }
+  document.getElementById('panic').addEventListener('click', allOff);
+  window.addEventListener('blur', allOff);
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
+    if (e.code in KEYMAP) { e.preventDefault(); if (!e.repeat) noteOn(e.code, baseNote() + KEYMAP[e.code]); return; }
+    if (e.repeat) return;
+    if (e.code === 'KeyZ') octave = Math.max(-2, octave - 1);
+    else if (e.code === 'KeyX') octave = Math.min(8, octave + 1);
+    else if (e.code === 'KeyC') velIdx = Math.max(0, velIdx - 1);
+    else if (e.code === 'KeyV') velIdx = Math.min(VELS.length - 1, velIdx + 1);
+    else return;
+    e.preventDefault();
+    updateKeyLabels();
+  });
+  window.addEventListener('keyup', e => { if (e.code in KEYMAP) noteOff(e.code); });
+  const keysEl = document.getElementById('keys'), keyEls = [];
+  const whiteSemis = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16];
+  const isBlack = s => [1, 3, 6, 8, 10, 13, 15].includes(s);
+  Object.keys(KEYMAP).forEach(code => {
+    const semi = KEYMAP[code], el = document.createElement('div');
+    el.className = 'key ' + (isBlack(semi) ? 'b' : 'w');
+    el.dataset.semi = semi;
+    el.innerHTML = '<span class="c"></span>' + KEYCAP[code];
+    if (isBlack(semi)) { const left = whiteSemis.filter(w => w < semi).length; el.style.left = 'calc(' + (left * 10) + '% - 3.2%)'; el.style.width = '6.4%'; }
+    else { el.style.left = (whiteSemis.indexOf(semi) * 10) + '%'; el.style.width = '10%'; }
+    const pid = 'ptr' + semi;
+    el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); noteOn(pid, baseNote() + semi); e.preventDefault(); });
+    const up = () => noteOff(pid);
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    keysEl.appendChild(el); keyEls.push(el);
+  });
+  function paintKeys() { const b = baseNote(); for (const el of keyEls) el.classList.toggle('on', sounding.has(b + +el.dataset.semi)); }
+  function updateKeyLabels() {
+    const b = baseNote();
+    for (const el of keyEls) { const s = +el.dataset.semi; el.firstChild.textContent = (s % 12 === 0) ? noteName(b + s) : ''; }
+    document.getElementById('roOct').textContent = noteName(b);
+    document.getElementById('roVel').textContent = VELS[velIdx];
+    paintKeys();
+  }
+  updateKeyLabels();
+
+  /* ---------- messages from the engine ---------- */
+  const roCpu = document.getElementById('roCpu'), roVo = document.getElementById('roVo');
+  let view = [], fade = 0;
+  function onMsg(e) {
+    const m = e.data;
+    if (m.t !== 'stat') return;
+    if (m.moved) for (const id in m.moved) {
+      if (id === 'wheel') wheelEl.value = m.moved[id]; else if (id === 'aftertouch') pressEl.value = m.moved[id];
+      else setValue(id, m.moved[id], true);
+    }
+    if (m.lines.length) { view = m.lines; fade = 1; }
+    roVo.textContent = m.voices + '/' + (state.mode === 0 ? 1 : m.max);
+    const pc = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
+    roCpu.textContent = pc(m.load) + (m.peak >= 0 ? ' · PEAK ' + pc(m.peak) : '');
+    roCpu.className = m.load > 0.5 || m.peak > 0.8 ? 'warn' : '';
+  }
+
+  /* ---------- the pretzel ---------- */
+  // one closed path: the belly, both lobes, and the two arms crossing in the middle; traced once per cycle
+  const KNOT = [[-0.52, 0.6], [-0.22, 0.42], [0, 0.2], [0.1, -0.12], [0.1, -0.52], [0.3, -0.84], [0.64, -0.88], [0.94, -0.58], [1, -0.06], [0.86, 0.46], [0.5, 0.82], [0, 0.92],
+                [-0.5, 0.82], [-0.86, 0.46], [-1, -0.06], [-0.94, -0.58], [-0.64, -0.88], [-0.3, -0.84], [-0.1, -0.52], [-0.1, -0.12], [0, 0.2], [0.22, 0.42], [0.52, 0.6], [0, 0.76]];
+  const PM = 512;                     // points on the path, evenly spaced along it
+  let pathCache = null;
+  // tight 0–1 pulls the lobes in and the crossing up: Twist tightens the knot
+  function knotPath(tight) {
+    const key = Math.round(tight * 100);
+    if (pathCache && pathCache.key === key) return pathCache;
+    const t = key / 100, P = KNOT.map(([x, y]) => {
+      const up = Math.max(0, 0.6 - y) / 1.4;        // 0 at the belly, 1 at the top of the lobes
+      return [x * (1 - 0.3 * t * up), y + 0.16 * t * up * (1 - Math.abs(x))];
+    });
+    // closed Catmull-Rom, sampled finely, then resampled by arc length
+    const n = P.length, fine = [];
+    for (let i = 0; i < n; i++) {
+      const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+      for (let j = 0; j < 64; j++) {
+        const u = j / 64, u2 = u * u, u3 = u2 * u;
+        const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (-a + 3 * b - 3 * c + d) * u3);
+        fine.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+      }
+    }
+    fine.push(fine[0]);
+    const cum = [0]; for (let i = 1; i < fine.length; i++) cum.push(cum[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+    const total = cum[cum.length - 1], pts = [];
+    for (let k = 0, j = 0; k < PM; k++) {
+      const s = k / PM * total; while (cum[j + 1] < s) j++;
+      const f = (s - cum[j]) / Math.max(1e-9, cum[j + 1] - cum[j]);
+      pts.push([fine[j][0] + (fine[j + 1][0] - fine[j][0]) * f, fine[j][1] + (fine[j + 1][1] - fine[j][1]) * f]);
+    }
+    // normals: to the left of travel (outward on the belly)
+    const nor = pts.map((p, k) => { const a = pts[(k - 1 + PM) % PM], b = pts[(k + 1) % PM], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; });
+    pathCache = { key, pts, nor };
+    return pathCache;
+  }
+  const knotC = document.getElementById('knot'), knotInfo = document.getElementById('knotInfo');
+  const TICKS = 24;                   // ticks per cycle of the phase the warp reads
+  const ORDER_TXT = ['WARP → SHAPE', 'SHAPE → WARP', 'MORPH'];
+  function peakOf(a) { let m = 1e-3; for (const v of a) m = Math.max(m, Math.abs(v)); return m; }
+  // where the read phase passes each 1/TICKS step: [index + fraction, …], unwrapping the wraps
+  function tickAt(read) {
+    const N = read.length, out = [];
+    let U = read[0], prevU = U;
+    for (let i = 1; i <= N; i++) {
+      const r = read[i % N];
+      let du = r - read[i - 1]; if (du < -0.5) du += 1; else if (du > 0.5) du -= 1;
+      U = prevU + du;
+      const a = Math.floor(prevU * TICKS), b = Math.floor(U * TICKS);
+      if (a !== b) for (let q = Math.min(a, b) + 1; q <= Math.max(a, b); q++) out.push(i - 1 + (q / TICKS - prevU) / (U - prevU));
+      prevU = U;
+      if (out.length > 600) break;
+    }
+    return out;
+  }
+  function drawKnot() {
+    const d = fit(knotC), W = knotC.width, H = knotC.height, x = knotC.getContext('2d');
+    x.clearRect(0, 0, W, H);
+    const lines = view, tw = lines.reduce((m, l) => Math.max(m, Math.min(1, l.twist / 0.5)), 0) * fade;
+    const { pts, nor } = knotPath(tw);
+    const sc = Math.min(W * 0.42, (H - 30 * d) * 0.43), cx = W / 2, cy = (H - 26 * d) * 0.5;
+    const X0 = p => cx + p[0] * sc, Y0 = p => cy + p[1] * sc;
+    // the dough
+    x.lineJoin = 'round'; x.lineCap = 'round';
+    x.strokeStyle = 'rgba(201,140,70,.13)'; x.lineWidth = 22 * d; x.beginPath();
+    pts.forEach((p, k) => k ? x.lineTo(X0(p), Y0(p)) : x.moveTo(X0(p), Y0(p))); x.closePath(); x.stroke();
+    x.strokeStyle = LCD + '.18)'; x.lineWidth = 1 * d; x.stroke();
+    if (!lines.length) {
+      x.fillStyle = LCD + '.55)'; x.font = (10 * d) + 'px Monaco, monospace'; x.textAlign = 'center';
+      x.fillText('PLAY A NOTE', cx, cy + 4 * d); x.textAlign = 'left';
+      knotInfo.textContent = '';
+      return;
+    }
+    const amp = 0.11 * sc, info = [];
+    for (const l of lines) {
+      const N = l.wave.length, pk = peakOf(l.wave), col = lineCol(l.L);
+      const at = i => { const k = (i / N) * PM, j = Math.floor(k) % PM, f = k - Math.floor(k), j1 = (j + 1) % PM;
+        const wi = Math.floor(i) % N, wf = i - Math.floor(i), y = (l.wave[wi] + (l.wave[(wi + 1) % N] - l.wave[wi]) * wf) / pk;
+        const px = pts[j][0] + (pts[j1][0] - pts[j][0]) * f, py = pts[j][1] + (pts[j1][1] - pts[j][1]) * f, n = nor[j];
+        return [cx + px * sc + n[0] * y * amp, cy + py * sc + n[1] * y * amp, n]; };
+      x.globalAlpha = 0.35 + 0.65 * fade;
+      x.strokeStyle = col; x.lineWidth = 2 * d; x.shadowColor = col; x.shadowBlur = 6 * d;
+      x.beginPath();
+      for (let i = 0; i <= N; i++) { const [px, py] = at(i % N === 0 && i ? 0 : i); i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke(); x.shadowBlur = 0;
+      // ticks: even steps of the phase the warp reads; they bunch where the cycle is read fast
+      x.strokeStyle = l.L === 1 ? '#fff0df' : '#e4f7dc'; x.lineWidth = 1.2 * d;
+      x.beginPath();
+      for (const ti of tickAt(l.read)) { const [px, py, n] = at(ti); x.moveTo(px - n[0] * 5 * d, py - n[1] * 5 * d); x.lineTo(px + n[0] * 5 * d, py + n[1] * 5 * d); }
+      x.stroke();
+      // where the cycle starts
+      const [sx, sy] = at(0); x.fillStyle = col; x.beginPath(); x.arc(sx, sy, 3.5 * d, 0, 2 * Math.PI); x.fill();
+      x.globalAlpha = 1;
+      info.push('LINE ' + l.L + (l.src !== l.L ? ' (1′)' : '') + ' · ' + hzF(l.hz) + ' · WARP ' + l.warp.toFixed(2) + ' · SHAPE ' + l.shape.toFixed(2) + ' · ' + ORDER_TXT[l.order] + (l.order === 2 ? ' ' + l.tm.toFixed(2) : '') + (l.twist > 0 ? ' · TWIST' : ''));
+    }
+    knotInfo.innerHTML = info.map(s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('<br>');
+  }
+  /* ---------- side views ---------- */
+  const gC = document.getElementById('gView'), sC = document.getElementById('sView'), wC = document.getElementById('wView');
+  function plot(c, draw) {
+    const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 6 * d, top = 16 * d;
+    x.clearRect(0, 0, W, H);
+    const PX = u => pad + u * (W - 2 * pad), PY = v => H - pad - v * (H - pad - top);
+    x.fillStyle = LCD + '.1)'; x.fillRect(PX(0), PY(0.5), W - 2 * pad, 1);
+    draw(x, PX, PY, d);
+  }
+  function curve(x, PX, PY, d, arr, f, col, alpha) {
+    x.globalAlpha = alpha; x.strokeStyle = col; x.lineWidth = 1.6 * d; x.beginPath();
+    const N = arr.length;
+    for (let i = 0; i < N; i++) { const [u, v] = f(arr[i], i, N); i ? x.lineTo(PX(u), PY(v)) : x.moveTo(PX(u), PY(v)); }
+    x.stroke(); x.globalAlpha = 1;
+  }
+  function drawSide() {
+    const a = 0.35 + 0.65 * fade;
+    plot(gC, (x, PX, PY, d) => {
+      x.strokeStyle = LCD + '.15)'; x.lineWidth = 1 * d; x.beginPath(); x.moveTo(PX(0), PY(0)); x.lineTo(PX(1), PY(1)); x.stroke();
+      for (const l of view) {
+        // a jump back is a wrap: draw it as a break
+        x.globalAlpha = a; x.strokeStyle = lineCol(l.L); x.lineWidth = 1.6 * d; x.beginPath();
+        const N = l.read.length;
+        for (let i = 0; i < N; i++) { const u = i / N, v = l.read[i]; if (i && Math.abs(v - l.read[i - 1]) > 0.5) x.moveTo(PX(u), PY(v)); else if (i) x.lineTo(PX(u), PY(v)); else x.moveTo(PX(u), PY(v)); }
+        x.stroke(); x.globalAlpha = 1;
+      }
+    });
+    plot(sC, (x, PX, PY, d) => {
+      x.strokeStyle = LCD + '.15)'; x.lineWidth = 1 * d; x.beginPath(); x.moveTo(PX(0), PY(0)); x.lineTo(PX(1), PY(1)); x.stroke();
+      for (const l of view) curve(x, PX, PY, d, l.xfer, (v, i, N) => [i / (N - 1), 0.5 + 0.5 * Math.max(-1.2, Math.min(1.2, v)) / 1.2 * 1], lineCol(l.L), a);
+    });
+    plot(wC, (x, PX, PY, d) => {
+      for (const l of view) { const pk = peakOf(l.wave); curve(x, PX, PY, d, l.wave, (v, i, N) => [i / N, 0.5 + 0.48 * v / pk], lineCol(l.L), a); }
+    });
+  }
+
+  /* ---------- spectrogram ---------- */
+  const spec = document.getElementById('spec'), axis = document.getElementById('axis');
+  const sx = spec.getContext('2d'), ax = axis.getContext('2d');
+  let fbuf = null, col = null;
+  const STOPS = [[0, 6, 6, 8], [0.35, 30, 70, 30], [0.7, 245, 130, 31], [1, 255, 246, 230]];
+  const LUT = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255; let a = STOPS[0], b = STOPS[STOPS.length - 1];
+    for (let s = 0; s < STOPS.length - 1; s++) if (t >= STOPS[s][0] && t <= STOPS[s + 1][0]) { a = STOPS[s]; b = STOPS[s + 1]; break; }
+    const u = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    for (let c = 0; c < 3; c++) LUT[i * 3 + c] = a[c + 1] + (b[c + 1] - a[c + 1]) * u;
+  }
+  function fitSpec() {
+    const r = spec.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (spec.width !== w || spec.height !== h) {
+      spec.width = w; spec.height = h; axis.width = w; axis.height = h;
+      sx.fillStyle = '#060608'; sx.fillRect(0, 0, w, h);
+      col = sx.createImageData(1, h);
+      ax.clearRect(0, 0, w, h);
+      ax.font = (9 * d) + 'px Monaco, monospace'; ax.textAlign = 'right';
+      for (const f of [5000, 10000, 15000, 20000]) {
+        const y = h - f / 20000 * (h - 2) - 1;
+        ax.fillStyle = LCD + '.18)'; ax.fillRect(0, Math.round(y), w, 1);
+        ax.fillStyle = LCD + '.7)'; ax.fillText((f / 1000) + 'k', w - 4 * d, Math.max(10 * d, y - 3 * d));
+      }
+    }
+    return d;
+  }
+  function drawSpec(stepPx) {
+    const d = fitSpec(), W = spec.width, H = spec.height;
+    const step = Math.max(1, Math.round(stepPx * d));
+    sx.drawImage(spec, -step, 0);
+    if (!analyser) { sx.fillStyle = '#060608'; sx.fillRect(W - step, 0, step, H); return; }
+    if (!fbuf) fbuf = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(fbuf);
+    const binHz = ctx.sampleRate / analyser.fftSize, lo = analyser.minDecibels, hi = analyser.maxDecibels, data = col.data;
+    for (let y = 0; y < H; y++) {
+      const fTop = (H - y) / H * 20000, fBot = (H - y - 1) / H * 20000;
+      const b0 = Math.floor(fBot / binHz), b1 = Math.max(b0 + 1, Math.ceil(fTop / binHz)); let m = -200;
+      for (let b = b0; b < b1 && b < fbuf.length; b++) if (fbuf[b] > m) m = fbuf[b];
+      const t = Math.min(1, Math.max(0, (m - lo) / (hi - lo))), li = Math.round(Math.pow(t, 1.1) * 255) * 3, o = y * 4;
+      data[o] = LUT[li]; data[o + 1] = LUT[li + 1]; data[o + 2] = LUT[li + 2]; data[o + 3] = 255;
+    }
+    for (let s = 0; s < step; s++) sx.putImageData(col, W - step + s, 0);
+  }
+
+  const slow = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = 0, lastW = 0;
+  function frame(t) {
+    const dt = last ? Math.min(0.1, (t - last) / 1000) : 1 / 60; last = t;
+    if (view.length && fade > 0) { /* the last voice stays drawn, dimmed, once it ends */ }
+    drawKnot(); drawSide();
+    if (!slow || t - lastW > 250) { lastW = t; drawSpec(Math.max(1, spec.getBoundingClientRect().width / 3 * dt)); }
+    requestAnimationFrame(frame);
+  }
+  // once no voice sounds, the last one stays drawn, dimmed
+  setInterval(() => { if (ready && roVo.textContent.startsWith('0/')) fade = Math.max(0, fade - 0.1); }, 50);
+  window.addEventListener('resize', redrawEditors);
+  redrawEditors();
+  requestAnimationFrame(frame);
+  window.__pretzel = { state, ctl, send, start, loadPreset, showPage, setValue };
+})();
+</script>
+</body>
+</html>

@@ -1352,6 +1352,7 @@
 
   PretzelEngine.BLOCK = BLOCK; PretzelEngine.OS = OS; PretzelEngine.MAX_VOICES = MAX_VOICES;
   PretzelEngine.toNorm = toNorm; PretzelEngine.fromNorm = fromNorm;
+  PretzelEngine.core = core;      // for the bench's live view (it draws the waves with the engine's own functions)
   if (typeof module !== 'undefined' && module.exports) module.exports = { PretzelEngine, PARAMS, core, DEST_IDS, NDEST, destName, LINE_SELECT, LFO_SHAPES, SYNC_BEATS };
   else root.PretzelEngine = PretzelEngine;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

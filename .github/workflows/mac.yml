@@ -20,6 +20,8 @@ jobs:
           node --version
       - name: Engine tests
         run: node tests/engine-test.js | tee tests.txt
+      - name: Bench tests (the browser bench plays every preset as its WAV)
+        run: node tests/bench-test.js | tee bench-tests.txt
       - name: Benchmark
         run: node tools/perf.js 3 | tee bench.txt
       - name: Render the test presets
@@ -29,6 +31,7 @@ jobs:
           name: results
           path: |
             tests.txt
+            bench-tests.txt
             bench.txt
             renders.txt
             renders/*.wav
@@ -38,6 +41,7 @@ jobs:
           {
             sysctl -n machdep.cpu.brand_string
             tail -1 tests.txt
+            tail -1 bench-tests.txt
             cat bench.txt
           } > results.txt
           body=$(sed -e 's/%/%25/g' results.txt | awk '{printf "%s%%0A", $0}')

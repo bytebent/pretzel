@@ -1,0 +1,2955 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pretzel</title>
+<style>
+
+:root{
+  --platinum:#dcdce0; --platinum-hi:#ececef; --etch:#9c9ca4; --ink:#000; --ink-soft:#4a4a52; --inset:#f4f4f6; --desk:#b9b9c0;
+  --blue:#f5821f; --blue-dk:#b4570b; --blue-lt:#ffc994; --blue-deep:#7a3906; --graphite:#6e6e78; --screen:#0b0b0e; --lcd:#ffc994;
+  --ui:"Lucida Grande","Lucida Sans Unicode",Geneva,Verdana,sans-serif; --mono:Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(circle at 1px 1px, rgba(0,0,0,.09) 1px, transparent 1.5px) 0 0/6px 6px, var(--desk);
+  font:13px/1.45 var(--ui); color:var(--ink); padding:24px 16px 40px; -webkit-user-select:none; user-select:none}
+.window{max-width:1060px;margin:0 auto;
+  background:repeating-linear-gradient(0deg, rgba(255,255,255,.55) 0 1px, rgba(255,255,255,0) 1px 2px, rgba(0,0,0,.035) 2px 3px, rgba(0,0,0,0) 3px 4px), var(--platinum);
+  border:1px solid #7d7d86;border-radius:9px;box-shadow:0 1px 0 #fff inset, 0 12px 32px rgba(0,0,0,.22);overflow:hidden}
+.titlebar{display:flex;align-items:center;gap:12px;padding:9px 14px 8px;background:linear-gradient(#f6f6f8,#d6d6db);border-bottom:1px solid #8e8e96}
+.mark{width:22px;height:18px;border-radius:3px;background:var(--graphite);box-shadow:0 0 0 1px rgba(0,0,0,.35);position:relative;flex:none;overflow:hidden}
+.mark::after{content:"";position:absolute;left:0;right:0;top:7px;height:4px;background:var(--blue)}
+.titlebar h1{margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px}
+.titlebar .sub{color:var(--ink-soft);font-size:11px}
+.titlebar .sub .ver{margin-left:6px;color:#7a7a84}
+.titlebar .tag{margin-left:auto;color:var(--ink-soft);font-size:11px}
+.body{padding:14px 18px 16px}
+
+/* screen */
+.screen{background:var(--screen);border-radius:6px;padding:10px;box-shadow:0 0 0 1px #000,0 2px 6px rgba(0,0,0,.5) inset;position:relative}
+.view{position:relative}
+.view canvas{display:block;width:100%;height:180px;border-radius:3px;background:#060608}
+.view canvas.axis{position:absolute;inset:0;background:transparent;pointer-events:none}
+.view .lbl{position:absolute;left:8px;top:6px;font:10px/1 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:1px;pointer-events:none}
+.readouts{display:flex;flex-wrap:wrap;gap:4px 18px;font:11px/1 var(--mono);color:var(--lcd);margin-top:8px;letter-spacing:1px}
+.readouts b{font-weight:400;opacity:.6;margin-right:6px}
+.readouts .hot{color:#fff}
+.readouts .warn{color:#fff;background:var(--blue-dk);padding:1px 4px;border-radius:2px;margin:-1px -4px}
+.power{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(11,11,14,.86);border-radius:6px;z-index:2;color:var(--lcd);font:11px var(--mono);letter-spacing:1px}
+.power.hide{display:none}
+
+/* controls */
+.rows{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+fieldset{flex:1 1 auto;margin:0;border:1px solid var(--etch);border-radius:6px;padding:8px 12px 10px;background:rgba(236,236,239,.7);box-shadow:0 1px 0 #fff, inset 0 1px 0 #fff;min-width:0}
+legend{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;padding:0 6px;display:flex;align-items:center;gap:6px}
+legend .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
+.knobs{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;justify-content:space-around}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;width:64px}
+.knob.big{width:92px}
+.dial{--a0:0deg;--a1:0deg;--c:var(--blue);position:relative;width:44px;height:44px;border-radius:50%;cursor:ns-resize;touch-action:none;outline:none;
+  background:conic-gradient(from 225deg, #b9b9c0 0 var(--a0), var(--c) var(--a0) var(--a1), #b9b9c0 var(--a1) 270deg, transparent 270deg)}
+.knob.big .dial{width:70px;height:70px}
+.dial::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--platinum-hi)}
+.dial .cap{position:absolute;inset:6px;border-radius:50%;
+  background:radial-gradient(circle at 50% 22%, rgba(255,255,255,.95) 0 18%, rgba(255,255,255,0) 46%), radial-gradient(circle at 50% 80%, #f7f7fa, #c8c8ce 60%, #9a9aa3);
+  box-shadow:0 2px 3px rgba(0,0,0,.35), 0 0 0 1px #7d7d86}
+.knob.big .dial .cap{inset:8px}
+.dial .ptr{position:absolute;inset:6px;border-radius:50%;pointer-events:none}
+.knob.big .dial .ptr{inset:8px}
+.dial .ptr::after{content:"";position:absolute;left:50%;top:3px;width:3px;height:30%;margin-left:-1.5px;border-radius:2px;background:#1a1a1e}
+.dial .mark30{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.dial .mark30::after{content:"";position:absolute;left:50%;top:-3px;width:2px;height:7px;margin-left:-1px;background:var(--blue-deep);border-radius:1px}
+.dial:focus-visible{box-shadow:0 0 0 2px var(--blue)}
+.knob .name{font-weight:700;white-space:nowrap}
+.val{font:700 10.5px var(--ui);background:var(--inset);box-shadow:inset 0 1px 2px rgba(0,0,0,.25);border-radius:3px;padding:1px 6px;min-width:56px;text-align:center;white-space:nowrap}
+
+.seg{display:inline-flex;flex-wrap:wrap;justify-content:center;border:1px solid #7d7d86;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.seg button{font:700 11px var(--ui);border:0;padding:4px 10px;cursor:pointer;color:#222;background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea)}
+.seg button+button{border-left:1px solid #9c9ca4}
+.seg button[aria-pressed="true"]{color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,.3);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45)}
+.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.segwrap{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;font-weight:700;padding-bottom:4px}
+.chips{display:flex;gap:3px;margin-top:2px}
+.chips button{font:700 9.5px var(--ui);border:1px solid #7d7d86;border-radius:8px;padding:1px 5px;cursor:pointer;background:linear-gradient(#fff,#d8d8dd);color:#222}
+.chips button:hover{background:linear-gradient(var(--blue-lt),var(--blue));color:#fff;border-color:var(--blue-dk)}
+.curve{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.curve canvas{width:96px;height:46px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset}
+
+.gel{display:inline-flex;align-items:center;padding:6px 18px;border-radius:999px;font:700 12px var(--ui);color:#fff;border:1px solid var(--blue-dk);position:relative;cursor:pointer;
+  background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45);box-shadow:0 2px 4px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.5) inset;text-shadow:0 -1px 0 rgba(0,0,0,.3)}
+.gel::before{content:"";position:absolute;left:10px;right:10px;top:2px;height:45%;border-radius:999px;background:linear-gradient(rgba(255,255,255,.75),rgba(255,255,255,.1));pointer-events:none}
+.gel.grey{color:#222;border-color:#7d7d86;text-shadow:0 1px 0 #fff;background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea)}
+.gel.small{padding:3px 12px;font-size:11px}
+.gel:focus-visible{outline:2px solid var(--blue-dk);outline-offset:2px}
+.dim{opacity:.4}
+
+/* pages */
+.tabs{display:flex;gap:0;margin-top:14px;border-bottom:1px solid #8e8e96;padding-left:10px}
+.tabs button{font:700 12px var(--ui);border:1px solid #8e8e96;border-bottom:0;border-radius:7px 7px 0 0;padding:6px 18px 5px;margin-right:-1px;cursor:pointer;color:#222;
+  background:linear-gradient(#fff,#d8d8dd 48%,#c4c4ca 52%,#e6e6ea);display:inline-flex;align-items:center;gap:7px;position:relative;top:1px}
+.tabs button[aria-selected="true"]{color:#fff;text-shadow:0 -1px 0 rgba(0,0,0,.3);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45);border-color:var(--blue-dk)}
+.tabs button:focus-visible{outline:2px solid var(--blue-dk);outline-offset:1px}
+.led{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#eee,#9c9ca4 60%,#6e6e78);box-shadow:0 0 0 1px rgba(0,0,0,.45) inset;flex:none}
+.led.on{background:radial-gradient(circle at 35% 30%,#fff0df,var(--blue) 60%,var(--blue-dk));box-shadow:0 0 6px var(--blue),0 0 0 1px rgba(0,0,0,.45) inset}
+.page[hidden]{display:none}
+.page .rows{margin-top:12px}
+.lfos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.lfo .knobs{display:grid;grid-template-columns:140px repeat(3, minmax(64px, 1fr));gap:10px 10px;align-items:end;justify-items:center}
+.lfo .knobs > :nth-child(1){grid-column:1;grid-row:1;justify-self:start;align-items:flex-start}
+.lfo .knobs > :nth-child(2){grid-column:2 / 5;grid-row:1}
+.lfo .knobs > :nth-child(3){grid-column:1;grid-row:2 / 4;align-self:center;justify-self:start}
+.lfo .knobs > :nth-child(4){grid-column:2;grid-row:2}
+.lfo .knobs > :nth-child(5){grid-column:2;grid-row:3}
+.lfo .knobs > :nth-child(6){grid-column:3;grid-row:2}
+.lfo .knobs > :nth-child(7){grid-column:4;grid-row:2}
+.lfo .knobs > :nth-child(8){grid-column:3 / 5;grid-row:3}
+.lfo .seg button{padding:4px 8px}
+.lfo legend .led{margin-left:2px}
+.lfohead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;width:100%}
+.lfohead label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700}
+.scope{width:132px;height:58px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;display:block}
+.dial .moddot{position:absolute;inset:0;border-radius:50%;pointer-events:none;display:none}
+.dial .moddot::after{content:"";position:absolute;left:50%;top:-2px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px var(--blue-dk),0 0 6px var(--blue)}
+.dial .moddot.on{display:block}
+.modnote{font-size:11px;color:var(--ink-soft);margin-top:8px}
+/* bench extras */
+.extras{margin-top:12px;border-style:dashed;background:rgba(244,244,246,.55)}
+.extras legend{color:var(--ink-soft)}
+.prow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+select,input[type=number]{font:12px var(--ui);padding:3px 6px;border:1px solid #7d7d86;border-radius:4px;background:linear-gradient(#fff,#ececef);box-shadow:inset 0 1px 1px rgba(0,0,0,.08)}
+select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.lane{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;margin-top:8px}
+.lane canvas{width:100%;height:54px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none}
+.check{display:inline-flex;align-items:center;gap:7px;font-weight:700;cursor:pointer}
+.check input{appearance:none;-webkit-appearance:none;width:16px;height:16px;margin:0;border-radius:4px;border:1px solid #7d7d86;cursor:pointer;
+  background:linear-gradient(#fff,#d8d8dd);box-shadow:0 1px 2px rgba(0,0,0,.2);position:relative}
+.check input:checked{border-color:var(--blue-dk);background:linear-gradient(var(--blue-lt),var(--blue) 48%,#e06d0c 52%,#ff9f45)}
+.check input:checked::after{content:"";position:absolute;left:5px;top:1px;width:4px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.check input:focus-visible{box-shadow:0 0 0 2px var(--blue)}
+.note{font-size:11px;color:var(--ink-soft)}
+
+/* keyboard */
+.play{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:14px}
+.bend{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;width:50px}
+.bend input{writing-mode:vertical-lr;direction:rtl;width:24px;height:96px}
+.kbd{position:relative;height:118px;border-radius:6px;background:linear-gradient(#3a3a40,#1d1d22);padding:8px 8px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 4px rgba(0,0,0,.3)}
+.keys{position:relative;height:100%}
+.key{position:absolute;top:0;bottom:0;border-radius:0 0 5px 5px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font:700 11px var(--mono);cursor:pointer;touch-action:none}
+.key.w{background:linear-gradient(#fff,#e6e6ea);border:1px solid #6e6e78;color:#6e6e78;z-index:1}
+.key.b{background:linear-gradient(#3b3b42,#111);height:62%;bottom:auto;color:#bbb;z-index:2;border:1px solid #000;font-size:10px;padding-bottom:4px}
+.key.on.w{background:linear-gradient(#ffe2c4,var(--blue));color:#fff}
+.key.on.b{background:linear-gradient(var(--blue-lt),var(--blue-dk));color:#fff}
+.key .c{position:absolute;top:6px;font:9px var(--ui);color:#9c9ca4;font-weight:400}
+
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:12px;font-size:11px;color:var(--ink-soft)}
+.foot .sp{margin-left:auto}
+.err{display:none;margin-top:10px;padding:8px 10px;border-left:4px solid var(--blue-dk);background:#fff1e3;font-size:12px}
+@media (max-width:720px){ .lfos{grid-template-columns:1fr}
+  .lfo .knobs{grid-template-columns:repeat(3, 1fr)}
+  .lfo .knobs > :nth-child(1){grid-column:1 / 4;grid-row:1}
+  .lfo .knobs > :nth-child(2){grid-column:1 / 4;grid-row:2}
+  .lfo .knobs > :nth-child(3){grid-column:1 / 4;grid-row:3;justify-self:center}
+  .lfo .knobs > :nth-child(4){grid-column:1;grid-row:4}
+  .lfo .knobs > :nth-child(6){grid-column:2;grid-row:4}
+  .lfo .knobs > :nth-child(7){grid-column:3;grid-row:4}
+  .lfo .knobs > :nth-child(5){grid-column:1 / 4;grid-row:5}
+  .lfo .knobs > :nth-child(8){grid-column:1 / 4;grid-row:6}
+  .scope{width:220px} .titlebar .tag{display:none} .lane{grid-template-columns:auto 1fr} .lane canvas{grid-column:1 / -1} .play{grid-template-columns:1fr} .bend{flex-direction:row;width:auto} .bend input{writing-mode:horizontal-tb;direction:ltr;width:160px;height:auto} }
+/* pretzel additions */
+[hidden]{display:none !important}
+.sliders{display:flex;gap:6px}
+:root{ --green:#61bb46; --green-dk:#3c8a2a; }
+.mark::before{content:"";position:absolute;left:0;right:0;top:12px;height:3px;background:var(--green)}
+.top{display:grid;grid-template-columns:1fr 210px;gap:8px}
+.panel{position:relative}
+.panel canvas{display:block;width:100%;border-radius:3px;background:#060608}
+.panel .lbl{position:absolute;left:8px;top:6px;font:10px/1 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:1px;pointer-events:none}
+.panel .lbl2{position:absolute;left:8px;bottom:6px;font:10px/1.5 var(--mono);color:var(--lcd);opacity:.85;letter-spacing:.5px;pointer-events:none}
+#knot{height:316px}
+.side{display:grid;grid-template-rows:repeat(3,1fr);gap:8px}
+.side canvas{height:100px}
+.screen .view{margin-top:8px}
+.view canvas#spec,.view canvas#axis{height:110px}
+legend .dot.g{background:var(--green)}
+.tabs .sw{width:8px;height:8px;border-radius:2px;display:inline-block}
+.part{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;justify-content:space-around;width:100%;padding-top:6px;border-top:1px dotted var(--etch);margin-top:4px}
+.part[hidden]{display:none}
+.knobs select{max-width:170px}
+.edit{display:flex;flex-direction:column;gap:6px;width:100%}
+.edit canvas{width:100%;height:120px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none;display:block}
+.edit .row{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:11px;font-weight:700}
+.edit .ro{font:10.5px var(--mono);color:var(--ink-soft);font-weight:400;margin-left:auto}
+.bars canvas{height:84px}
+.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%}
+.frames canvas{width:100%;height:64px;border-radius:4px;background:var(--screen);box-shadow:0 0 0 1px #000 inset;cursor:crosshair;touch-action:none;display:block}
+.frames .f{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;align-items:center}
+.frames .f.dim{opacity:.4}
+.wide{flex:1 1 100%}
+.mods{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.dest{display:flex;gap:8px;align-items:flex-end}
+@media (max-width:720px){ .top{grid-template-columns:1fr} .side{grid-template-rows:none;grid-template-columns:repeat(3,1fr)} .side canvas{height:80px} .mods{grid-template-columns:1fr} .sliders{flex-direction:column} #knot{height:280px} }
+</style>
+</head>
+<body>
+<div class="window" role="application" aria-label="pretzel test bench">
+  <div class="titlebar">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>pretzel</h1>
+    <span class="sub">Bytebent Audio<span class="ver">bench v0.1</span></span>
+    <span class="tag">phase distortion and waveshaping</span>
+  </div>
+  <div class="body">
+    <div class="screen">
+      <div class="top">
+        <div class="panel">
+          <canvas id="knot" aria-label="The wave drawn around a pretzel: the level bends the line, ticks mark even steps of the phase the warp reads"></canvas>
+          <span class="lbl">PRETZEL · NEWEST VOICE</span>
+          <span class="lbl2" id="knotInfo"></span>
+        </div>
+        <div class="side">
+          <div class="panel"><canvas id="gView" aria-label="The warp curve: the phase the cosine is read at, over one cycle"></canvas><span class="lbl">WARP g</span></div>
+          <div class="panel"><canvas id="sView" aria-label="The shaper's transfer curve at the Shape it has now"></canvas><span class="lbl">SHAPER S</span></div>
+          <div class="panel"><canvas id="wView" aria-label="One cycle of the wave on a straight line"></canvas><span class="lbl">WAVE</span></div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="spec" aria-label="Scrolling spectrogram of the output, 0 to 20 kHz"></canvas>
+        <canvas id="axis" class="axis" aria-hidden="true"></canvas>
+        <span class="lbl">SPECTROGRAM · 0–20 kHz · LAST 3 S</span>
+      </div>
+      <div class="readouts" aria-live="off">
+        <span><b>VOICES</b><span id="roVo">0</span></span>
+        <span><b>OCT</b><span id="roOct">C3</span></span>
+        <span><b>VEL</b><span id="roVel">100</span></span>
+        <span><b>BEND</b><span id="roBend">0</span></span>
+        <span title="Share of one CPU core the engine needs to keep up, averaged over half a second; peak is the slowest single audio callback. This is the JavaScript reference engine; the plugin's C++ will be lighter."><b>DSP</b><span id="roCpu">—</span></span>
+      </div>
+      <div class="power" id="power">
+        <button class="gel" id="powerBtn" type="button">Power on</button>
+        <span>PLAY WITH THE COMPUTER KEYBOARD: A–; · Z/X OCTAVE · C/V VELOCITY</span>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Pages">
+      <button type="button" role="tab" id="tab-l1" aria-selected="true">Line 1 <span class="sw" style="background:var(--blue)"></span></button>
+      <button type="button" role="tab" id="tab-l2" aria-selected="false">Line 2 <span class="sw" style="background:var(--green)"></span></button>
+      <button type="button" role="tab" id="tab-voice" aria-selected="false">Voice</button>
+      <button type="button" role="tab" id="tab-mod" aria-selected="false">Modulation <span class="led" id="modLed" aria-hidden="true"></span></button>
+    </div>
+    <div class="page" id="page-l1" role="tabpanel"></div>
+    <div class="page" id="page-l2" role="tabpanel" hidden></div>
+    <div class="page" id="page-voice" role="tabpanel" hidden>
+      <div class="rows">
+        <fieldset><legend><span class="dot"></span>Lines</legend><div class="knobs" id="g-lines"></div></fieldset>
+        <fieldset><legend><span class="dot"></span>Voice</legend><div class="knobs" id="g-voice"></div></fieldset>
+        <fieldset><legend><span class="dot"></span>Output</legend><div class="knobs" id="g-out"></div></fieldset>
+      </div>
+    </div>
+    <div class="page" id="page-mod" role="tabpanel" hidden>
+      <div class="mods" id="mods"></div>
+      <div class="modnote">Each source adds its depth to up to two destinations, in knob travel (Pitch: ±12 semitones at full depth). A destination is on both lines, line 1 or line 2. LFOs and mod envelopes run per voice.</div>
+    </div>
+
+    <fieldset class="extras">
+      <legend><span class="dot" style="background:#fff;box-shadow:0 0 0 1px #6e6e78 inset"></span>Bench only: test presets</legend>
+      <div class="prow">
+        <label for="presetSel" style="font-weight:700">Test preset</label>
+        <select id="presetSel"></select>
+        <button class="gel small" id="presetLoad" type="button">Load</button>
+        <button class="gel grey small" id="presetPlay" type="button">Load and play</button>
+        <button class="gel grey small" id="resetAll" type="button">Reset to defaults</button>
+      </div>
+      <div class="note" id="presetAbout" style="margin-top:6px"></div>
+      <div class="note" style="margin-top:4px">Load and play plays the preset's own phrase, as in its WAV. Test presets stay out of the plugin build.</div>
+    </fieldset>
+
+    <div class="play">
+      <div class="sliders">
+        <div class="bend"><span>Bend</span><input type="range" id="bend" min="-1" max="1" step="0.001" value="0" aria-label="Pitch bend, springs back"></div>
+        <div class="bend"><span>Wheel</span><input type="range" id="wheel" min="0" max="1" step="0.001" value="0" aria-label="Mod wheel"></div>
+        <div class="bend" title="Aftertouch. Springs back."><span>Press</span><input type="range" id="press" min="0" max="1" step="0.001" value="0" aria-label="Aftertouch, springs back"></div>
+      </div>
+      <div class="kbd"><div class="keys" id="keys"></div></div>
+    </div>
+    <div class="foot">
+      <label>Tempo (for synced LFOs) <input type="number" id="tempo" min="40" max="240" value="120" style="width:64px"> BPM</label>
+      <span>Latency 32 samples · 4× oversampled</span>
+      <button class="gel grey sp" id="panic" type="button">All notes off</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<script type="text/plain" id="dsp">
+/*
+ * Pretzel engine v0.2 · bytebent
+ *
+ * A synth that bends a wave on both axes: phase distortion bends time, waveshaping bends level.
+ * Batches 02–03 (see plan.md): one line, with the CZ-style warp (Warp = phase distortion) and the
+ * shaper after it.
+ *
+ *   - Every wave reads one unipolar cosine, c(u) = (1 − cos 2πu)/2, at a warped phase u = g(φ),
+ *     and is then centred. Warp 0 puts the pivot at the middle of the cycle: a pure cosine.
+ *   - The CZ waves and windows (hidden ones included), and window on any wave, follow MAME's
+ *     µPD933 emulation:
+ *
+ *         Wave and window formulas ported from MAME src/devices/sound/upd933.cpp
+ *         license:BSD-3-Clause, copyright-holders: Devin Acker
+ *         Redistribution and use in source and binary forms, with or without modification, are
+ *         permitted provided that the conditions of the BSD 3-Clause License are met: the above
+ *         copyright notice, this list of conditions and the disclaimer are retained, and the names
+ *         of the copyright holders are not used to endorse or promote products derived from it.
+ *         THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ *
+ *   - Wave pairs alternate two waves on successive cycles, as on the CZ.
+ *   - Warp amount has Pretzel's own curve (not the CZ's 0–99 table): the pivot halves every 1/7
+ *     of the knob, so brightness grows evenly. It is capped by pitch as the chip does, so the
+ *     first segment never gets shorter than 4 internal samples.
+ *   - 8-stage envelopes (time and level per stage, sustain point, end point) for Warp and Amp.
+ *     Amp gain is the envelope level squared (0.5 is −12 dB).
+ *   - The shaper (Shape 0 and Bias 0 pass the wave unchanged in every family):
+ *       Chebyshev  Σ e_k·T_k(x), k = 1…16. Shape fades harmonic k in as Shape^(1 + (k−2)/4), so the
+ *                  sound brightens toward the designed spectrum, and the fundamental moves from 1
+ *                  to its slider; at Shape 1 the harmonics have exactly the sliders' ratios.
+ *                  Tilt and Odd/Even scale all 16 at once.
+ *       Fold       Triangle (reflect at ±1), Sine (sin(G·asin x), a sine of the wave's own phase),
+ *                  Analog (four Lockhart stages in closed form with Lambert W; Esqueda, Pöntynen,
+ *                  Parker & Bilbao 2017). Shape is the fold gain G = 10^Shape, 1 to 10.
+ *       Saturate   tanh, arctan, cubic soft clip, f(d·x)/f(d) with drive d = 16·Shape².
+ *       Drawn      up to four keyframe curves, morphed; Shape fades the curve in. Each curve keeps
+ *                  its antiderivative for antialiasing (batch 04).
+ *     Bias offsets the input (x + b)/(1 + |b|), for even harmonics. The Shape envelope, Link (the
+ *     Warp envelope also driving Shape), key follow and velocity set Shape per sample.
+ *   - Levels are evened out: every block the voice measures the RMS of its wave at the current
+ *     Warp and Shape and divides by it to the power 0.7, as in Throat, so a narrow pulse, a window
+ *     or a shaper does not move the level by up to 16 dB.
+ *
+ * Everything runs at 4x the host rate in fixed 32-sample blocks, then is decimated with a
+ * 128-tap windowed-sinc FIR, as in Throat and Syrinx. process() never allocates. Same seed and
+ * notes: same output, at any host buffer size.
+ *
+ * Works in an AudioWorklet and in Node (module.exports) for offline tests.
+ */
+(function (root) {
+  'use strict';
+
+  const OS = 4;                 // internal oversampling
+  const BLOCK = 32;             // fixed internal block (host samples) = latency
+  const FIR_LEN = 128;          // decimation filter taps (at 4x rate)
+  const MAX_VOICES = 8;         // Poly voices (to be confirmed by the Mac benchmark, batch 05)
+  const TWO_PI = 2 * Math.PI;
+  const LEVEL = 0.35;           // one voice at full amp envelope
+  const PIVOT_OCT = 7;          // Warp 1 puts the pivot 7 octaves below the middle (1/256 of a cycle)
+  const WARP_FMAX = 1 / 8;      // the chip's pitch cap, made the same for every wave: the steepest part of
+                                // a wave never reads the cosine faster than 1/8 of the internal rate
+                                // (24 kHz at 48 kHz; for the Saw, a first segment of at least 4 samples)
+  const CHEB_LO = 0.3, CHEB_HI = 0.45;   // Chebyshev band limit: harmonic k fades out as k × the wave's
+                                // fastest frequency goes from 0.3 to 0.45 of the internal rate
+                                // (0.6–0.85 left 10 dB more aliasing: the steep part spreads widely)
+  const ADAA_EPS = 1e-6;        // below this input step, ADAA takes the shaper at the midpoint
+  const RESO_MAX = 17;          // resonance ratio at Warp 1 (the chip reaches about 17)
+  const RESO_NYQ = 0.45;        // resonance formant kept below this share of the host rate
+  const RESO_OS = 0.12;         // … and, after the shaper's steepening, below this share of the internal rate
+                                // (0.35 let a folded formant alias at −12 dB at MIDI 96; 0.12 equals the host
+                                // limit when nothing steepens it)
+  const LEVEL_POW = 0.7;        // loudness evened by the wave's RMS to this power, as in Throat
+  const LEVEL_MAX = 4;          // at most +12 dB of evening out
+  const LEVEL_PTS = 16;         // points per piece of the cycle used to measure the wave's level
+  const LEVEL_PEAK = 4;         // evening out never pushes a wave's peak past this (a cosine's is 1)
+  const DC_HZ = 5;              // per-line DC blocker
+  const TWIST_MAX = 0.5;        // Twist 1 moves the read phase by up to half a cycle (±π, DX-style full feedback)
+  const TWIST_LP = 0.25;        // the loop's low-pass, as a share of the internal rate
+  const TWIST_LPA = 1 - Math.exp(-TWO_PI * TWIST_LP);
+  const TWIST_REF = 440;        // above this pitch, Twist's depth falls as √(440/f)
+  const COS_N = 4096;           // cosine table size
+
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+  /* ---------- the carrier ---------- */
+  // unipolar cosine c(u) = (1 − cos 2πu)/2 over one cycle, read with linear interpolation
+  const COS = new Float64Array(COS_N + 1);
+  for (let i = 0; i <= COS_N; i++) COS[i] = (1 - Math.cos(TWO_PI * i / COS_N)) / 2;
+  function carrier(u) {
+    const x = u * COS_N, i = Math.floor(x), f = x - i;
+    const j = i < 0 ? 0 : i >= COS_N ? COS_N - 1 : i;
+    return COS[j] + (COS[j + 1] - COS[j]) * f;
+  }
+
+  /* ---------- the CZ waves and windows (from MAME upd933.cpp, BSD-3-Clause) ---------- */
+  const WAVES = ['Saw', 'Square', 'Pulse', 'Double sine', 'Saw-pulse', 'Resonance', 'Double pulse'];
+  const WINDOWS = ['None', 'Saw', 'Triangle', 'Trapezoid', 'Pulse', 'Double saw'];
+
+  // warped phase u (0–1) for wave w at phase φ (0–1), pivot p (0 < p ≤ 0.5) and resonance ratio k
+  function warpU(w, ph, p, k) {
+    switch (w) {
+      case 0:   // saw: rises over [0, p), falls over [p, 1)
+        return ph < p ? 0.5 * ph / p : 0.5 + 0.5 * (ph - p) / (1 - p);
+      case 1: { // square: each half rises over [0, p), then holds; the second half is offset by 0.5
+        const half = ph < 0.5 ? 0 : 0.5, h = ph - half;
+        return half + (h < p ? 0.5 * h / p : 0.5);
+      }
+      case 2:   // pulse: one full cosine over [0, 2p), then holds at the bottom
+        return ph < 2 * p ? ph / (2 * p) : 1;
+      case 3:   // double sine: a full cosine over [0, p), another over [p, 1)
+        return ph < p ? ph / p : (ph - p) / (1 - p);
+      case 4:   // saw-pulse: rises over [0, 0.5), falls over [0.5, 0.5 + p), then holds at the bottom
+        return ph < 0.5 ? ph : ph < 0.5 + p ? 0.5 + 0.5 * (ph - 0.5) / p : 1;
+      case 5: { // resonance: k times the frequency, hard-synced to the cycle
+        const u = k * ph;
+        return u - Math.floor(u);
+      }
+      case 6: { // double pulse (hidden): each half rises over [0, p), then holds at the bottom
+        const h = ph < 0.5 ? ph : ph - 0.5;
+        return h < p ? 0.5 * h / p : 1;
+      }
+      // ---- out-of-bounds families (batch 06); p and k carry each family's own values ----
+      case 7: { // Vector (VPS; Kleimola, Lazzarini, Timoney & Välimäki 2011): breakpoint (d, v) = (p, k)
+        const g = ph < p ? k * ph / p : k + (1 - k) * (ph - p) / (1 - p);
+        return g - Math.floor(g);
+      }
+      case 8:   // Smooth, power: φ^q, q = k
+        return Math.pow(ph, k);
+      case 9:   // Smooth, sigmoid: a tanh S through the middle of the cycle, steepness c = k
+        return 0.5 + 0.5 * Math.tanh(k * (ph - 0.5)) / Math.tanh(0.5 * k);
+      case 10:  // Smooth, Bezier: handles (hx, hy) = (p, k) and (1 − hx, 1 − hy)
+        return bezierAt(ph, p, k);
+      case 11: { // Sync: r = k times the frequency, hard-synced to the cycle
+        const u = k * ph;
+        return u - Math.floor(u);
+      }
+    }
+    return ph;
+  }
+  // cubic Bezier from (0, 0) to (1, 1) with handles (hx, hy) and (1 − hx, 1 − hy), read at x = φ
+  // (x(t) is monotonic for hx in 0–1; Newton's method from t = φ, then the value y(t))
+  function bezierAt(x, hx, hy) {
+    const bx = (t) => 3 * (1 - t) * (1 - t) * t * hx + 3 * (1 - t) * t * t * (1 - hx) + t * t * t;
+    let t = x;
+    for (let i = 0; i < 6; i++) {
+      const d = 3 * (1 - t) * (1 - t) * hx + 6 * (1 - t) * t * (1 - 2 * hx) + 3 * t * t * (hx);
+      if (Math.abs(d) < 1e-9) break;
+      t = Math.min(1, Math.max(0, t - (bx(t) - x) / d));
+    }
+    const y = 3 * (1 - t) * (1 - t) * t * hy + 3 * (1 - t) * t * t * (1 - hy) + t * t * t;
+    return y - Math.floor(y);
+  }
+  // its steepest slope dy/dx, from 64 points
+  function bezierSlope(hx, hy) {
+    let m = 0, x0 = 0, y0 = 0;
+    for (let i = 1; i <= 64; i++) {
+      const t = i / 64, x = 3 * (1 - t) * (1 - t) * t * hx + 3 * (1 - t) * t * t * (1 - hx) + t * t * t;
+      const y = 3 * (1 - t) * (1 - t) * t * hy + 3 * (1 - t) * t * t * (1 - hy) + t * t * t;
+      if (x > x0) m = Math.max(m, Math.abs(y - y0) / (x - x0));
+      x0 = x; y0 = y;
+    }
+    return m;
+  }
+  // window level (0–1) at phase φ
+  function windowW(win, ph) {
+    switch (win) {
+      case 1: return 1 - ph;                                          // saw: falls
+      case 2: return ph < 0.5 ? 2 * ph : 2 - 2 * ph;                  // triangle: rises, then falls
+      case 3: return ph < 0.5 ? 1 : 2 - 2 * ph;                       // trapezoid: flat, then falls
+      case 4: return ph < 0.5 ? 1 - 2 * ph : 0;                       // pulse (hidden): falls, then 0
+      case 5: return ph < 0.5 ? 2 * ph : 2 * ph - 1;                  // double saw (hidden): rises twice
+    }
+    return 1;
+  }
+  // one sample of a wave, centred: −1 … +1 (a window adds DC, removed by the line's DC blocker)
+  function waveSample(w, win, ph, p, k) {
+    return 2 * carrier(warpU(w, ph, p, k)) * windowW(win, ph) - 1;
+  }
+  const FAMILIES = ['CZ', 'Vector', 'Smooth', 'Sync'];
+  const CURVES = ['Power', 'Sigmoid', 'Bezier'];
+  // An out-of-bounds warp at Warp amount a, with the steepest slope it may have (gmax): into o.w, o.p,
+  // o.k (as warpU reads them). Warp 0 is a pure cosine in every family: the knobs set where Warp 1
+  // goes. Each family is held under gmax (the pitch cap, divided by the shaper's steepening).
+  //   Vector: (d, v) moves from (½, ½), the plain phase, to (vecx, vecy); d is kept where both slopes
+  //           stay under gmax
+  //   Smooth: Power q = 2^(5a), Sigmoid c = 4(2^(4a) − 1), Bezier handles from (⅓, ⅓) toward (vecx, vecy/4)
+  //   Sync:   r = 1 + a(ratio − 1)
+  function warpFamily(o, fam, curve, a, vx, vy, ratio, gmax, rmax) {
+    gmax = Math.max(gmax, 1);      // a pure cosine has slope 1: below that the cap means "no warp"
+    switch (fam) {
+      case 1: {
+        // (½, ½) is the plain phase; v > 1 reads more than a cycle by d (a formant)
+        let v = 0.5 + a * (vy - 0.5);
+        if (v > 1) v = Math.min(v, 0.5 * (gmax + 1));
+        const lo = Math.max(v / gmax, 1e-3), hi = Math.min(1 - Math.abs(1 - v) / gmax, 1 - 1e-3);
+        o.w = 7; o.k = v; o.p = clamp(0.5 + a * (vx - 0.5), lo, Math.max(lo, hi));
+        return;
+      }
+      case 2:
+        if (curve === 0) { o.w = 8; o.k = Math.min(Math.pow(2, 5 * a), gmax); o.p = Math.max(0.5, 1 - 4 / o.k); return; }
+        if (curve === 1) {
+          // the sigmoid's slope at its middle is c / (2·tanh(c/2)): the largest c under gmax, by iteration
+          let cmax = 1e-3;
+          if (gmax > 1.0001) { cmax = 2 * gmax; for (let i = 0; i < 30; i++) cmax = 2 * gmax * Math.tanh(0.5 * cmax); }
+          o.w = 9; o.k = Math.max(1e-3, Math.min(4 * (Math.pow(2, 4 * a) - 1), cmax)); o.p = Math.max(0, 0.5 - 2 / o.k); return;
+        }
+        {
+          // Bezier: blend toward the knobs' handles, and back off while the slope is too steep
+          let f = a, hx = 0, hy = 0;
+          for (let i = 0; i < 12; i++) {
+            hx = 1 / 3 + f * (vx - 1 / 3); hy = 1 / 3 + f * (vy / 4 - 1 / 3);
+            bzSlope = bezierSlope(hx, hy);
+            if (bzSlope <= gmax) break;
+            f = i < 11 ? f * 0.7 : 0;
+            if (f === 0) { hx = hy = 1 / 3; bzSlope = 1; break; }
+          }
+          o.w = 10; o.p = hx; o.k = hy;
+          return;
+        }
+      case 3:
+        o.w = 11; o.p = 0.5; o.k = Math.max(1, Math.min(1 + a * (ratio - 1), gmax, rmax));
+        return;
+    }
+  }
+  // the warp's steepest slope, g′, is SLOPE[w]/p (Resonance: k; Saw-pulse at least 1)
+  const SLOPE = [0.5, 0.5, 0.5, 1, 0.5, 0, 0.5, 0, 0, 0, 0, 0];
+  let bzSlope = 1;               // the current Bezier's steepest slope (set with its handles)
+  function maxSlope(w, p, k) {
+    switch (w) {
+      case 5: case 11: return k;
+      case 7: return Math.max(k / p, Math.abs(1 - k) / (1 - p), 1);
+      case 8: return Math.max(k, 1);
+      case 9: return Math.max(k / (2 * Math.tanh(0.5 * k)), 1);
+      case 10: return Math.max(bzSlope, 1);
+    }
+    return Math.max(SLOPE[w] / p, 1);
+  }
+  // Warp amount (0–1) → pivot, and → resonance ratio
+  function pivotOf(a, cap) { return Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), cap); }
+  function resoOf(a, kmax) { return Math.min(Math.pow(RESO_MAX, a), kmax); }
+
+  /* ---------- the shaper ---------- */
+  const SHAPERS = ['Chebyshev', 'Fold', 'Saturate', 'Drawn'];
+  const FOLDS = ['Triangle', 'Sine', 'Analog'];
+  const SATS = ['Tanh', 'Arctan', 'Cubic'];
+  const NH = 16;                // Chebyshev harmonics
+  const FOLD_MAX = 10;          // fold gain at Shape 1
+  const SAT_MAX = 16;           // saturation drive at Shape 1 (d = 16·Shape²)
+  const CURVE_N = 256;          // drawn curve table: CURVE_N + 1 points over −1 … 1
+  const MAX_KEYS = 4;           // drawn keyframes
+
+  // Lockhart wavefolder (Esqueda, Pöntynen, Parker & Bilbao 2017, eq. 28): R = 15 kΩ, RL = 7.5 kΩ,
+  // Is = 1e−17 A, VT = 25.864 mV; four stages between a 1/3 pre-gain and a ×3 post-gain (their §6)
+  const LK_VT = 0.025864, LK_A = 2 * 7500 / 15000, LK_B = (2 * 7500 + 15000) / (LK_VT * 15000);
+  const LK_LND = Math.log(7500 * 1e-17 / LK_VT);
+  // Lambert W (principal branch) of e^L, for any L
+  function lambertWexp(L) {
+    if (L < 1) {
+      const z = Math.exp(L);
+      let w = z < 0.3 ? z * (1 - z * (1 - 1.5 * z)) : 0.5 * L + 0.5;
+      for (let i = 0; i < 4; i++) { const ew = Math.exp(w); w -= (w * ew - z) / (ew * (w + 1)); }
+      return w;
+    }
+    let w = L - Math.log(L);
+    for (let i = 0; i < 4; i++) w -= (w + Math.log(w) - L) * w / (1 + w);
+    return w;
+  }
+  function lockhart(v) {
+    if (v === 0) return 0;
+    const l = v > 0 ? 1 : -1;
+    return LK_A * v - l * LK_VT * lambertWexp(LK_LND + l * LK_B * v);
+  }
+  function analogFold(v) {
+    let u = v / 3;
+    for (let i = 0; i < 4; i++) u = lockhart(u);
+    return 3 * u;
+  }
+  // the Analog folder as a table over −ANA_Z … ANA_Z, with its antiderivative: exact enough (checked in
+  // the tests), much faster than four Lambert W per sample, and it gives ADAA its antiderivative
+  const ANA_Z = 11, ANA_N = 1 << 14, ANA_H = 2 * ANA_Z / ANA_N;
+  const ANA = new Float64Array(ANA_N + 1), ANA_F = new Float64Array(ANA_N + 1);
+  for (let i = 0; i <= ANA_N; i++) ANA[i] = analogFold(-ANA_Z + i * ANA_H);
+  for (let i = 1; i <= ANA_N; i++) ANA_F[i] = ANA_F[i - 1] + 0.5 * ANA_H * (ANA[i - 1] + ANA[i]);
+  function anaAt(z) {
+    const x = (clamp(z, -ANA_Z, ANA_Z) + ANA_Z) / ANA_H, i = Math.min(ANA_N - 1, Math.floor(x)), f = x - i;
+    return ANA[i] + (ANA[i + 1] - ANA[i]) * f;
+  }
+  function anaF(z) {
+    const x = (clamp(z, -ANA_Z, ANA_Z) + ANA_Z) / ANA_H, i = Math.min(ANA_N - 1, Math.floor(x)), f = x - i;
+    return ANA_F[i] + ANA_H * f * (ANA[i] + 0.5 * (ANA[i + 1] - ANA[i]) * f);
+  }
+  const analogTab = { anaAt, anaF, ANA_Z };
+  function triFold(v) {
+    let t = (v + 1) * 0.25;
+    t -= Math.floor(t);
+    return 1 - 4 * Math.abs(t - 0.5);
+  }
+  // antiderivative of the triangle fold: periodic (period 4), piecewise quadratic
+  function triFoldF(z) {
+    let t = (z + 1) * 0.25;
+    t = (t - Math.floor(t)) * 4 - 1;        // −1 … 3
+    return t <= 1 ? 0.5 * t * t : 2 * t - 0.5 * t * t - 1;
+  }
+  // antiderivatives of the saturation curves (log cosh written so it cannot overflow)
+  function satCurveF(t, u) {
+    const a = Math.abs(u);
+    switch (t) {
+      // log cosh u: for small u as log1p(2·sinh²(u/2)), which keeps its precision near 0 (the other form
+      // lost it there and a Shape envelope closing to 0 crackled at −58 dB); for large u without overflow
+      case 0: { if (a < 20) { const h = Math.sinh(0.5 * a); return Math.log1p(2 * h * h); } return a + Math.log1p(Math.exp(-2 * a)) - Math.LN2; }
+      case 1: return u * Math.atan(u) - 0.5 * Math.log1p(u * u);
+      default: return a >= 1 ? (2 / 3) * a - 0.25 : 0.5 * u * u - u * u * u * u / 12;
+    }
+  }
+  // tanh, arctan and cubic soft clip, each scaled so f(d·x)/f(d) has a peak of 1
+  function satCurve(t, u) {
+    switch (t) {
+      case 0: return Math.tanh(u);
+      case 1: return Math.atan(u);
+      default: return u >= 1 ? 2 / 3 : u <= -1 ? -2 / 3 : u - u * u * u / 3;
+    }
+  }
+
+  // drawn curves: a table of CURVE_N + 1 values over −1 … 1, and its antiderivative F1 (from −1),
+  // exact for the straight lines between table points
+  function curveTable(points, smooth) {
+    const y = new Float64Array(CURVE_N + 1);
+    const pts = points.slice().sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i <= CURVE_N; i++) {
+      const x = -1 + 2 * i / CURVE_N;
+      let j = 0;
+      while (j < pts.length - 2 && pts[j + 1][0] < x) j++;
+      const [x1, y1] = pts[j], [x2, y2] = pts[Math.min(j + 1, pts.length - 1)];
+      const f = x2 > x1 ? clamp((x - x1) / (x2 - x1), 0, 1) : 0;
+      if (!smooth) { y[i] = y1 + (y2 - y1) * f; continue; }
+      // Catmull-Rom through the points
+      const y0 = j > 0 ? pts[j - 1][1] : 2 * y1 - y2, y3 = j + 2 < pts.length ? pts[j + 2][1] : 2 * y2 - y1;
+      y[i] = clamp(y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0))), -1, 1);
+    }
+    return y;
+  }
+  function antiderivative(y) {
+    const F = new Float64Array(CURVE_N + 1), h = 2 / CURVE_N;
+    for (let i = 1; i <= CURVE_N; i++) F[i] = F[i - 1] + 0.5 * h * (y[i - 1] + y[i]);
+    return F;
+  }
+  function tableAt(y, v) {
+    const x = (clamp(v, -1, 1) + 1) * 0.5 * CURVE_N, i = Math.min(CURVE_N - 1, Math.floor(x)), f = x - i;
+    return y[i] + (y[i + 1] - y[i]) * f;
+  }
+  function antiAt(y, F, v) {      // F1 at v (linear between table points, so quadratic inside one)
+    const x = (clamp(v, -1, 1) + 1) * 0.5 * CURVE_N, i = Math.min(CURVE_N - 1, Math.floor(x)), f = x - i, h = 2 / CURVE_N;
+    return F[i] + h * f * (y[i] + 0.5 * (y[i + 1] - y[i]) * f);
+  }
+  // the four default keyframes: soft S, terraces, a sine fold, a full-wave rectifier
+  const DEFAULT_CURVES = [
+    (v) => Math.sin(Math.PI * v / 2),
+    (v) => v - Math.sin(4 * Math.PI * v) / (4 * Math.PI),
+    (v) => Math.sin(1.5 * Math.PI * v),
+    (v) => 2 * Math.abs(v) - 1,
+  ].map((f) => { const y = new Float64Array(CURVE_N + 1); for (let i = 0; i <= CURVE_N; i++) y[i] = f(-1 + 2 * i / CURVE_N); return y; });
+
+  // one line's shaper settings for a block. e: Chebyshev weights at Shape 1 (after Tilt, Odd/Even);
+  // c: scratch for the weights at the current Shape; dy, dF: the morphed drawn curve and its F1.
+  function makeShaper() {
+    return {
+      nS: NaN, nSub: -1, n: 1, ver: 0, lv: NaN, lf: 0, ls: 0, lver: -1, lp: 0, dS: NaN, dP: NaN, dV: -1, gS: NaN, g: 1,
+      fam: 0, sub: 0, bias: 0, fpk: 0, dmax: 1, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), d: new Float64Array(NH + 3),
+      dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1),
+    };
+  }
+  // the shaped value of x (−1 … 1) at Shape s
+  function shapeSample(sh, x, s) {
+    const b = sh.bias;
+    if (s === 0 && b === 0) return x;
+    const v = b === 0 ? x : (x + b) / (1 + Math.abs(b));
+    switch (sh.fam) {
+      case 0: {                         // Chebyshev, by Clenshaw's recurrence
+        const c = chebNow(sh, s);
+        let b1 = 0, b2 = 0;
+        for (let k = NH; k >= 1; k--) { const t = c[k] + 2 * v * b1 - b2; b2 = b1; b1 = t; }
+        return v * b1 - b2;
+      }
+      case 1: {                         // Fold
+        const g = foldGain(sh, s);         // 1 → 10, evenly in log: 1.8 at Shape ¼, 3.2 at ½
+        if (sh.sub === 0) return triFold(g * v);
+        if (sh.sub === 1) return Math.sin(g * Math.asin(clamp(v, -1, 1)));
+        // the Lockhart stages bend slightly even at gain 1; adding back that bend keeps Shape 0 exact
+        return anaAt(g * v) - anaAt(v) + v;
+      }
+      case 2: {                         // Saturate
+        const d = SAT_MAX * s * s;
+        if (d < 1e-6) return v;
+        return satCurve(sh.sub, d * v) / satNorm(sh, s, d);
+      }
+      default:                          // Drawn: Shape fades the curve in
+        return v + s * (tableAt(sh.dy, v) - v);
+    }
+  }
+  // the Chebyshev weights at Shape s, into sh.c. Harmonic k comes in as Shape^(1 + (k−2)/4), like a
+  // waveshaping index (harmonic 2 first and linearly, higher ones later); the fundamental moves in a
+  // straight line from 1 to its slider. Every exponent is at least 1, so the weights add up to at
+  // most 1. Band limit: harmonic k reads the warped cosine k times as fast, so its fastest frequency
+  // is k × the wave's (sh.fpk, a share of the internal rate); it fades out between CHEB_LO and CHEB_HI.
+  function chebNow(sh, s) {
+    const e = sh.e, c = sh.c, r = Math.sqrt(Math.sqrt(s)), f = sh.fpk;
+    let rk = s / r;
+    for (let k = 2; k <= NH; k++) {
+      rk *= r;
+      const fk = k * f;
+      c[k] = fk <= CHEB_LO ? e[k] * rk : fk >= CHEB_HI ? 0 : e[k] * rk * (CHEB_HI - fk) / (CHEB_HI - CHEB_LO);
+    }
+    c[1] = 1 - s + s * e[1];
+    return c;
+  }
+  // antiderivative of Σ c_k·T_k as Chebyshev coefficients d_0 … d_(NH+1):
+  // ∫T_1 = (T_0 + T_2)/4, ∫T_n = (T_(n+1)/(n+1) − T_(n−1)/(n−1))/2
+  function chebAntiCoeffs(c, d) {
+    d.fill(0);
+    d[0] += c[1] / 4; d[2] += c[1] / 4;
+    for (let n = 2; n <= NH; n++) { d[n + 1] += c[n] / (2 * (n + 1)); d[n - 1] -= c[n] / (2 * (n - 1)); }
+    return d;
+  }
+  function clenshaw0(d, n, v) {        // Σ_(m = 0…n) d_m·T_m(v)
+    let b1 = 0, b2 = 0;
+    for (let m = n; m >= 1; m--) { const t = d[m] + 2 * v * b1 - b2; b2 = b1; b1 = t; }
+    return d[0] + v * b1 - b2;
+  }
+  // the shaper's antiderivative F(v), in the shaper's own input v (after Bias), at Shape s. For
+  // Chebyshev, chebAntiCoeffs must have filled sh.d for this s.
+  function shapeAnti(sh, v, s) {
+    switch (sh.fam) {
+      case 0: return clenshaw0(sh.d, NH + 1, v);
+      case 1: {
+        const g = foldGain(sh, s);
+        if (sh.sub === 0) return triFoldF(g * v) / g;
+        if (sh.sub === 1) {
+          // ∫ sin(g·asin v) dv = −cos((g+1)θ)/(2(g+1)) − cos((g−1)θ)/(2(g−1)), θ = asin v; the second term
+          // is written as sin²((g−1)θ/2)/(g−1) (same slope), which stays exact as g → 1
+          const th = Math.asin(clamp(v, -1, 1)), ep = g - 1, sn = Math.sin(0.5 * ep * th);
+          return -Math.cos((g + 1) * th) / (2 * (g + 1)) + (ep === 0 ? 0 : sn * sn / ep);
+        }
+        return anaF(g * v) / g - anaF(v) + 0.5 * v * v;
+      }
+      case 2: {
+        const d = SAT_MAX * s * s;
+        if (d < 1e-6) return 0.5 * v * v;
+        return satCurveF(sh.sub, d * v) / (d * satNorm(sh, s, d));
+      }
+      default: return 0.5 * (1 - s) * v * v + s * antiAt(sh.dy, sh.dF, v);
+    }
+  }
+  // first-order antiderivative antialiasing (Parker, Zavalishin & Le Bivic 2016) between the last two
+  // inputs x0 → x1: the shaper averaged over the straight line between them. Shape 0 and Bias 0 give
+  // the plain average, the same half-sample delay as every shaper.
+  // Two caches keep the cost down without changing a single value: F at the step's start is F at the
+  // last step's end when nothing else changed, and the Chebyshev antiderivative's coefficients are
+  // only rebuilt when Shape or the band limit moves. sh.ver changes every block (new settings).
+  function shapeADAA(sh, x0, x1, s) {
+    const b = sh.bias;
+    if (s === 0 && b === 0) { sh.lv = NaN; return 0.5 * (x0 + x1); }
+    const k = b === 0 ? 1 : 1 / (1 + Math.abs(b));
+    const v0 = (x0 + b) * k, v1 = (x1 + b) * k, dv = v1 - v0;
+    if (Math.abs(dv) < ADAA_EPS) { sh.lv = NaN; return shapeSample(sh, 0.5 * (x0 + x1), s); }
+    if (sh.fam === 0 && (s !== sh.dS || sh.fpk !== sh.dP || sh.ver !== sh.dV)) {
+      chebAntiCoeffs(chebNow(sh, s), sh.d); sh.dS = s; sh.dP = sh.fpk; sh.dV = sh.ver;
+    }
+    const same = v0 === sh.lv && s === sh.ls && sh.ver === sh.lver && sh.fpk === sh.lp;
+    const F0 = same ? sh.lf : shapeAnti(sh, v0, s), F1 = shapeAnti(sh, v1, s);
+    sh.lv = v1; sh.lf = F1; sh.ls = s; sh.lver = sh.ver; sh.lp = sh.fpk;
+    return (F1 - F0) / dv;
+  }
+  // f(d), the saturator's value at full input, for drive d at Shape s (cached like the fold gain)
+  function satNorm(sh, s, d) {
+    if (s !== sh.nS || sh.sub !== sh.nSub) { sh.nS = s; sh.nSub = sh.sub; sh.n = satCurve(sh.sub, d); }
+    return sh.n;
+  }
+  function foldGain(sh, s) {
+    if (s !== sh.gS) { sh.gS = s; sh.g = Math.pow(FOLD_MAX, s); }
+    return sh.g;
+  }
+  // how much the shaper steepens the wave at Shape s (its largest slope): a fold of gain g makes every
+  // frequency g times higher, a saturator d/f(d) times near zero. The warp's pitch cap and the
+  // resonance ratio are divided by it, so a wave going into a hard fold is never steeper than the
+  // fold can take. Chebyshev has its own band limit (the harmonic fade) and counts as 1.
+  function expansion(sh, s) {
+    switch (sh.fam) {
+      case 1: return foldGain(sh, s);
+      case 2: { const d = SAT_MAX * s * s; return d < 1e-6 ? 1 : d * (sh.sub === 2 ? 1.5 : 1 / satNorm(sh, s, d)); }
+      case 3: return Math.max(1, 1 - s + s * sh.dmax);
+    }
+    return 1;
+  }
+  // Residuals that turn a box-filtered jump or kink into a triangle-filtered one (second order, like
+  // polyBLEP and polyBLAMP), for a breakpoint a share τ into the sample: on the sample before (m),
+  // this sample (o) and the next (p). The box and the triangle are both centred half a sample back,
+  // where ADAA puts its output.
+  const res = { m: 0, o: 0, p: 0 };
+  function phi2(u) { return u <= -1 ? 0 : u <= 0 ? 0.5 * (1 + u) * (1 + u) : u < 1 ? 1 - 0.5 * (1 - u) * (1 - u) : 1; }
+  function q2(u) { return u <= -1 ? 0 : u <= 0 ? (1 + u) * (1 + u) * (1 + u) / 6 : u < 1 ? u + (1 - u) * (1 - u) * (1 - u) / 6 : u; }
+  function residuals(t, J, S) {
+    // jump J: box gives clamp(m − ts, 0, 1), triangle phi2(m − ½ − ts); ts = t − 1 for this sample
+    // kink S (change of slope per sample): box gives the ramp's box average, triangle q2
+    const a = 1 - t;
+    res.m = J * phi2(-0.5 - t) + S * q2(-0.5 - t);
+    res.o = J * (phi2(0.5 - t) - a) + S * (q2(0.5 - t) - 0.5 * a * a);
+    res.p = J * (phi2(1.5 - t) - 1) + S * (q2(1.5 - t) - (1 + a - 0.5));
+    return res;
+  }
+  // Chebyshev weights at Shape 1: h_k × k^Tilt, and Odd/Even (> 0 cuts even harmonics, < 0 cuts
+  // odd ones above the fundamental). Scaled so they add up to 1: the output never passes ±1
+  // (|T_k| ≤ 1), and the harmonics keep exactly the ratios of the sliders.
+  function chebWeights(e, h, tilt, oe) {
+    let sum = 0;
+    for (let k = 1; k <= NH; k++) {
+      let g = h[k - 1] * Math.pow(k, tilt);
+      if (k % 2 === 0 && oe > 0) g *= 1 - oe;
+      if (k % 2 === 1 && k > 1 && oe < 0) g *= 1 + oe;
+      e[k] = g; sum += g;
+    }
+    if (sum < 1e-9) { e.fill(0); e[1] = 1; return; }
+    for (let k = 1; k <= NH; k++) e[k] /= sum;
+  }
+  // the morphed drawn curve: Morph 0–1 runs through the keyframes in order. Linear morphing of the
+  // curves and of their antiderivatives with the same weights gives the same result.
+  function morphCurves(sh, keys, F, n, m) {
+    const x = clamp(m, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(x)), f = x - i;
+    const a = keys[i], b = keys[i + 1], Fa = F[i], Fb = F[i + 1];
+    let mx = 0;
+    for (let j = 0; j <= CURVE_N; j++) {
+      sh.dy[j] = a[j] + (b[j] - a[j]) * f; sh.dF[j] = Fa[j] + (Fb[j] - Fa[j]) * f;
+      if (j) mx = Math.max(mx, Math.abs(sh.dy[j] - sh.dy[j - 1]));
+    }
+    sh.dmax = mx * CURVE_N / 2;
+  }
+
+  /* ---------- order: the shaper before the warp (batch 07) ---------- */
+  // Shape → Warp puts the shaper on the phase, in one of two modes, both kept as a switch after
+  // listening (design.md §6). Both leave the phase as it is at Shape 0.
+  //   Read (A): the shaped wave becomes the phase. The plain cosine x = −cos 2πφ is shaped, and the result
+  //      is read back as the phase a plain cosine would need to make it (acos), so the warp then reads
+  //      the shaped wave's own phase. At Warp 0 this gives exactly Warp → Shape.
+  //      (Taken literally, u = ½(S(cos 2πφ) + 1) is not the plain phase even at Shape 0: it reads a
+  //      cosine of a cosine.)
+  //   Bend (B): the shaper bends the phase ramp: u = ½(S(2φ − 1) + 1), two phase warps in a row.
+  const ORDERS = ['Warp→Shape', 'Shape→Warp', 'Morph'];
+  function prePhase(sh, ph, s, def) {
+    if (def === 1) return clamp(0.5 * (shapeSample(sh, 2 * ph - 1, s) + 1), 0, 1);
+    const y = clamp(shapeSample(sh, -Math.cos(TWO_PI * ph), s), -1, 1), th = Math.acos(-y) / TWO_PI;
+    return ph < 0.5 ? th : 1 - th;
+  }
+  // a line's wave at phase φ, with the shaper first when pre.s > 0 (the window always follows time)
+  // (rph: the phase the warp reads, when Twist moves it away from time; the window follows time)
+  function waveAt(w, win, ph, p, k, pre, rph) {
+    const r = rph === undefined ? ph : rph;
+    const u = pre && pre.s > 0 ? prePhase(pre.sh, r, pre.s, pre.def) : r;
+    return 2 * carrier(warpU(w, u, p, k)) * windowW(win, ph) - 1;
+  }
+  // how much a shaper on the phase steepens it: as after the warp, except Chebyshev, which multiplies
+  // the phase by its highest harmonic K (A) or steepens the ramp's ends by K² (B)
+  function expansionPre(sh, s, def) {
+    if (s <= 0) return 1;
+    if (sh.fam !== 0) return expansion(sh, s);
+    const c = chebNow(sh, s);
+    let K = 1;
+    for (let k = NH; k >= 2; k--) if (Math.abs(c[k]) > 0.01) { K = k; break; }
+    return def === 1 ? K * K : K;
+  }
+
+  // mean, RMS and peak (DC removed) of a line's wave over one cycle (both cycles of a wave pair).
+  // The cycle is cut at the warp's breakpoints and each piece gets the same number of points, so
+  // a narrow pulse is measured as well as a wide one.
+  const lvl = { mean: 0, rms: 1, peak: 1 };
+  const cuts = new Float64Array(8);
+  function levelOf(w0, w1, win, p, k, sh, sv, pre) {
+    let nc = 0;
+    for (const c of [0, p, 2 * p, 0.5, 0.5 + p, 1]) if (c <= 1) cuts[nc++] = c;
+    cuts.subarray(0, nc).sort();
+    let m = 0, s = 0, hi = -Infinity, lo = Infinity;
+    const n = w1 === w0 ? 1 : 2;
+    for (let c = 0; c < n; c++) {
+      const w = c ? w1 : w0;
+      for (let j = 1; j < nc; j++) {
+        const a = cuts[j - 1], len = cuts[j] - a;
+        if (len <= 0) continue;
+        for (let i = 0; i < LEVEL_PTS; i++) {
+          let x = waveAt(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k, pre);
+          if (sh) x = shapeSample(sh, x, sv);
+          m += x * len; s += x * x * len;
+          if (x > hi) hi = x; if (x < lo) lo = x;
+        }
+      }
+    }
+    m /= n * LEVEL_PTS; s /= n * LEVEL_PTS;
+    lvl.mean = m; lvl.rms = Math.sqrt(Math.max(s - m * m, 1e-12)); lvl.peak = Math.max(hi - m, m - lo, 1e-6);
+    return lvl;
+  }
+  // evening-out gain: RMS to the power 0.7, never more than +12 dB, and never pushing the peak
+  // past LEVEL_PEAK (a narrow pulse is spiky: matching its RMS would make it clip)
+  function levelGain(l) { return clamp(Math.min(Math.pow(Math.SQRT1_2 / l.rms, LEVEL_POW), LEVEL_PEAK / l.peak), 1 / LEVEL_MAX, LEVEL_MAX); }
+
+  const core = {
+    levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX,
+    maxSlope, SLOPE, WARP_FMAX, ORDERS, prePhase, waveAt, expansionPre, bezierAt, bezierSlope, FAMILIES, warpFamily, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
+    SHAPERS, FOLDS, SATS, NH, CURVE_N, makeShaper, shapeSample, chebWeights, morphCurves, curveTable, antiderivative,
+    tableAt, antiAt, lockhart, analogFold, lambertWexp, DEFAULT_CURVES,
+  };
+
+  /* ---------- parameters ---------- */
+  // ids, defaults and ranges: the one table the C++ core and the UI copy.
+  // log: the knob moves logarithmically; curve: knob position^curve; step: whole steps.
+  const ENV_DEFAULTS = {
+    aenv: { t: [0.005, 0.5, 0.3], l: [1, 0.7, 0], sus: 2, end: 3 },
+    wenv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
+    senv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
+    penv: { t: [0.05, 0.3], l: [0, 0], sus: 0, end: 2 },
+    menv: { t: [0.05, 0.5, 0.3], l: [1, 0.6, 0], sus: 2, end: 3 },
+  };
+  function envParams(name, line) {
+    const d = ENV_DEFAULTS[name], out = [];
+    for (let s = 1; s <= 8; s++) {
+      out.push({ id: name + line + 't' + s, def: s <= d.t.length ? d.t[s - 1] : 0.1, min: 0, max: 10, curve: 3 });
+      out.push({ id: name + line + 'l' + s, def: s <= d.l.length ? d.l[s - 1] : 0, min: 0, max: 1 });
+    }
+    out.push({ id: name + line + 'sus', def: d.sus, min: 0, max: 8, step: 1 });   // 0: no sustain
+    out.push({ id: name + line + 'end', def: d.end, min: 1, max: 8, step: 1 });
+    return out;
+  }
+  // one line's parameters, ids ending in its number (h-harmonics as h<k>_<line>)
+  function lineParams(L) {
+    return [
+      { id: 'level' + L, def: 0, min: -48, max: 6 },                    // dB
+      { id: 'octave' + L, def: 0, min: -3, max: 3, step: 1 },
+      { id: 'fifth' + L, def: 0, min: 0, max: 1, step: 1 },              // +7 semitones
+      { id: 'detune' + L, def: L === 2 ? 7 : 0, min: -100, max: 100 },   // cents
+      { id: 'penvdepth' + L, def: 0, min: -24, max: 24 },                // semitones at pitch envelope level 1
+      { id: 'wfamily' + L, def: 0, min: 0, max: 3, step: 1 },            // FAMILIES: CZ, Vector, Smooth, Sync
+      { id: 'wave' + L, def: 0, min: 0, max: 6, step: 1 },               // WAVES
+      { id: 'pair' + L, def: 0, min: 0, max: 7, step: 1 },               // 0 none, else WAVES[n − 1] on odd cycles
+      { id: 'window' + L, def: 0, min: 0, max: 5, step: 1 },             // WINDOWS, on any wave
+      { id: 'vecx' + L, def: 0.5, min: 0, max: 1 },                      // Vector d (Bezier handle x) at Warp 1
+      { id: 'vecy' + L, def: 1.5, min: 0, max: 4 },                      // Vector v (Bezier handle y × 4) at Warp 1
+      { id: 'curve' + L, def: 1, min: 0, max: 2, step: 1 },              // Smooth: Power, Sigmoid, Bezier
+      { id: 'ratio' + L, def: 2, min: 1, max: 16 },                      // Sync ratio at Warp 1
+      { id: 'warp' + L, def: 0, min: 0, max: 1 },                        // warp amount before the envelope
+      { id: 'warpkey' + L, def: 0.3, min: 0, max: 1 },                   // key follow: less warp above middle C
+      { id: 'wenvdepth' + L, def: 1, min: -1, max: 1 },
+      { id: 'velwarp' + L, def: 0.3, min: 0, max: 1 },
+      { id: 'velamp' + L, def: 0.7, min: 0, max: 1 },
+      { id: 'sfamily' + L, def: 0, min: 0, max: 3, step: 1 },            // SHAPERS
+      { id: 'shape' + L, def: 0, min: 0, max: 1 },                       // drive into the shaper, before the envelope
+      { id: 'bias' + L, def: 0, min: -1, max: 1 },                       // input offset: even harmonics
+      ...Array.from({ length: NH }, (_, i) => ({ id: 'h' + (i + 1) + '_' + L, def: i === 0 ? 1 : 0, min: 0, max: 1 })),   // Chebyshev harmonics
+      { id: 'tilt' + L, def: 0, min: -1, max: 1 },                       // harmonic k × k^Tilt
+      { id: 'oddeven' + L, def: 0, min: -1, max: 1 },                    // > 0 cuts even, < 0 cuts odd (above the fundamental)
+      { id: 'fold' + L, def: 1, min: 0, max: 2, step: 1 },               // FOLDS
+      { id: 'sat' + L, def: 0, min: 0, max: 2, step: 1 },                // SATS
+      { id: 'keys' + L, def: 4, min: 2, max: MAX_KEYS, step: 1 },        // drawn keyframes in use
+      { id: 'morph' + L, def: 0, min: 0, max: 1 },                       // through the drawn keyframes
+      { id: 'order' + L, def: 0, min: 0, max: 2, step: 1 },              // ORDERS
+      { id: 'ordermorph' + L, def: 0, min: 0, max: 1 },                  // Morph: 0 Warp→Shape … 1 Shape→Warp
+      { id: 'swmode' + L, def: 0, min: 0, max: 1, step: 1 },             // Shape→Warp: Read (A), Bend (B)
+      { id: 'morphway' + L, def: 0, min: 0, max: 1, step: 1 },           // Morph: Through the warp, Shared
+      { id: 'twist' + L, def: 0, min: 0, max: 1 },                       // feedback of the shaped wave into its own phase
+      { id: 'shapekey' + L, def: 0.3, min: 0, max: 1 },                  // key follow: less shape above middle C
+      { id: 'senvdepth' + L, def: 0, min: -1, max: 1 },
+      { id: 'link' + L, def: 0, min: -1, max: 1 },                       // the Warp envelope also drives Shape
+      { id: 'velshape' + L, def: 0.3, min: 0, max: 1 },
+      ...envParams('wenv', L),
+      ...envParams('senv', L),
+      ...envParams('aenv', L),
+      ...envParams('penv', L),
+    ];
+  }
+  // modulation destinations: none, then each of these on both lines, line 1 or line 2
+  const DEST_IDS = ['pitch', 'level', 'detune', 'warp', 'vecx', 'vecy', 'ratio', 'shape', 'bias', 'tilt', 'oddeven', 'morph', 'ordermorph', 'twist'];
+  const DEST_LINES = ['both', '1', '2'];
+  const NDEST = 1 + DEST_IDS.length * 3;
+  function destName(v) { return v <= 0 ? 'none' : DEST_IDS[Math.floor((v - 1) / 3)] + ' ' + DEST_LINES[(v - 1) % 3]; }
+  const LFO_SHAPES = ['Sine', 'Triangle', 'Saw', 'Square', 'Random'];
+  const SYNC_BEATS = [0.125, 0.25, 1 / 3, 0.5, 2 / 3, 1, 2, 4, 8, 16];   // 1/32, 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2, 1 bar, 2, 4 bars
+  function modParams(name, n) {
+    return [
+      { id: name + n + 'dest1', def: 0, min: 0, max: NDEST - 1, step: 1 },
+      { id: name + n + 'depth1', def: 0, min: -1, max: 1 },
+      { id: name + n + 'dest2', def: 0, min: 0, max: NDEST - 1, step: 1 },
+      { id: name + n + 'depth2', def: 0, min: -1, max: 1 },
+    ];
+  }
+  const PARAMS = [
+    // voice
+    { id: 'mode', def: 1, min: 0, max: 1, step: 1 },             // 0 mono, 1 poly (8 voices)
+    { id: 'glide', def: 0, min: 0, max: 2, curve: 3 },           // s, mono only
+    { id: 'lines', def: 3, min: 0, max: 3, step: 1 },            // LINE_SELECT: 1, 2, 1+1′, 1+2
+    { id: 'ring', def: 0, min: 0, max: 1, step: 1 },             // line 2 × line 1
+    { id: 'noise', def: 0, min: 0, max: 1, step: 1 },            // noise on line 2's pitch
+    ...lineParams(1),
+    ...lineParams(2),
+    // modulators (per voice)
+    ...[1, 2].flatMap((n) => [
+      { id: 'lfo' + n + 'shape', def: 0, min: 0, max: 4, step: 1 },          // LFO_SHAPES
+      { id: 'lfo' + n + 'rate', def: 2, min: 0.01, max: 50, log: true },    // Hz
+      { id: 'lfo' + n + 'sync', def: 0, min: 0, max: 1, step: 1 },          // rate from tempo
+      { id: 'lfo' + n + 'div', def: 5, min: 0, max: SYNC_BEATS.length - 1, step: 1 },   // SYNC_BEATS: one cycle
+      { id: 'lfo' + n + 'retrig', def: 1, min: 0, max: 1, step: 1 },        // restart on each note
+      ...modParams('lfo', n),
+    ]),
+    ...[1, 2].flatMap((n) => [...envParams('menv', n), ...modParams('menv', n)]),
+    { id: 'wheeldest', def: 0, min: 0, max: NDEST - 1, step: 1 },
+    { id: 'wheeldepth', def: 0, min: -1, max: 1 },
+    { id: 'atdest', def: 0, min: 0, max: NDEST - 1, step: 1 },
+    { id: 'atdepth', def: 0, min: -1, max: 1 },
+    // pitch and output
+    { id: 'transpose', def: 0, min: -24, max: 24, step: 1 },
+    { id: 'bendrange', def: 2, min: 2, max: 24, step: 1 },
+    { id: 'volume', def: -6, min: -48, max: 6 },                 // dB
+  ];
+  const PINDEX = {};
+  PARAMS.forEach((p, i) => { PINDEX[p.id] = i; });
+
+  // normalised 0–1 knob position ↔ value, for the bench and the plugin
+  function toNorm(d, v) {
+    if (d.log) return Math.log(v / d.min) / Math.log(d.max / d.min);
+    const x = (v - d.min) / (d.max - d.min);
+    return d.curve ? Math.pow(clamp(x, 0, 1), 1 / d.curve) : x;
+  }
+  function fromNorm(d, n) {
+    n = clamp(n, 0, 1);
+    if (d.log) return d.min * Math.pow(d.max / d.min, n);
+    return d.min + (d.max - d.min) * (d.curve ? Math.pow(n, d.curve) : n);
+  }
+
+  function makeFir() {
+    const h = new Float32Array(FIR_LEN);
+    const fc = 0.5 / OS * 0.92, M = (FIR_LEN - 1) / 2;
+    let sum = 0;
+    for (let n = 0; n < FIR_LEN; n++) {
+      const x = n - M;
+      const s = x === 0 ? 2 * fc : Math.sin(TWO_PI * fc * x) / (Math.PI * x);
+      const a = TWO_PI * n / (FIR_LEN - 1);
+      const w = 0.35875 - 0.48829 * Math.cos(a) + 0.14128 * Math.cos(2 * a) - 0.01168 * Math.cos(3 * a);
+      h[n] = s * w; sum += h[n];
+    }
+    for (let n = 0; n < FIR_LEN; n++) h[n] /= sum;
+    return h;
+  }
+
+  /* ---------- 8-stage envelope ---------- */
+  // Each stage travels in a straight line from where the envelope is to the stage's level, in the
+  // stage's time. It holds at the sustain stage while the key is down; a release jumps to the
+  // stage after the sustain point. At the end stage it stops and holds that level.
+  class Env {
+    constructor(eng, name) {
+      this.eng = eng; this.base = PINDEX[name + 't1'];
+      this.v = 0; this.stage = 0; this.inc = 0; this.left = 0; this.target = 0;
+      this.hold = false; this.done = true; this.held = false;
+    }
+    sus() { return Math.round(this.eng.p[this.base + 16]); }
+    end() { return Math.round(this.eng.p[this.base + 17]); }
+    seg() {
+      const p = this.eng.p, t = p[this.base + this.stage * 2], n = Math.max(1, Math.round(t * this.eng.srOS));
+      this.target = p[this.base + this.stage * 2 + 1];
+      this.inc = (this.target - this.v) / n; this.left = n; this.hold = false;
+    }
+    trigger() { this.stage = 0; this.done = false; this.held = true; this.seg(); }
+    release() {
+      this.held = false;
+      if (this.done) return;
+      const sus = Math.min(this.sus(), this.end());
+      if (sus > 0 && this.stage < sus) {
+        if (sus >= this.end()) { this.fade(0.01); return; }   // sustain is the end: fade out
+        this.stage = sus; this.seg();
+      } else if (this.hold) { this.stage++; this.seg(); }
+    }
+    fade(t) {     // a short straight line to 0, then done
+      this.stage = this.end() - 1; this.done = false; this.hold = false;
+      const n = Math.max(1, Math.round(t * this.eng.srOS));
+      this.target = 0; this.inc = -this.v / n; this.left = n;
+    }
+    next() {
+      if (this.done || this.hold) return this.v;
+      this.v += this.inc;
+      if (--this.left <= 0) {
+        this.v = this.target;
+        const s = this.stage + 1;                   // the stage just reached, 1-based
+        if (s >= this.end()) this.done = true;
+        else if (s === this.sus() && this.held) this.hold = true;
+        else { this.stage = s; this.seg(); }
+      }
+      return this.v;
+    }
+  }
+
+  /* ---------- one line: warp, shaper, Twist, envelopes ---------- */
+  // ids of a line's parameters, by name without the line number
+  function lineIndex(L) {
+    const ix = {};
+    lineParams(L).forEach((d) => { ix[d.id.slice(0, d.id.length - String(L).length).replace(/_$/, '')] = PINDEX[d.id]; });
+    return ix;
+  }
+  class Line {
+    constructor(voice, L) {
+      const eng = voice.eng;
+      this.voice = voice; this.eng = eng; this.L = L;
+      this.ix = lineIndex(L); this.src = L;      // src: whose settings it plays (line 1 for 1+1′)
+      this.ph = 0; this.odd = 0;
+      this.wenv = new Env(eng, 'wenv' + L); this.senv = new Env(eng, 'senv' + L); this.aenv = new Env(eng, 'aenv' + L);
+      this.penv = new Env(eng, 'penv' + L);
+      this.sh = makeShaper();
+      this.dcx = 0; this.dcy = 0; this.gain = 1;
+      this.x1 = 0;               // the wave one sample back
+      this.frPrev = 0; this.snap = true;   // pitch at the end of the last block; start the next at its own
+      this.acc = 0; this.bps = new Float64Array(4);   // split samples: running sum, breakpoints
+      this.q0 = 0; this.carry = 0;                     // the sample waiting for its residuals, and the next one's
+      this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
+      this.wp = 0.5; this.wk = 1;                      // pivot and resonance ratio, from warpPoint()
+      this.wo = { w: 0, p: 0.5, k: 1 };               // an out-of-bounds family's values
+      this.toff = 0; this.tp = 0; this.tlp = 0; this.E = 1;   // Twist's loop
+      this.pre = { sh: this.sh, s: 0, def: 0 };       // the shaper on the phase (order), for waveAt
+      this.sPost = 0;                                  // Shape after the warp, from orderSplit()
+      this.k = {};          // per-block settings, filled by settings()
+      this.on = false;      // sounding in this voice
+      this.noise = false;   // CZ noise on its pitch (line 2)
+      this.pitchMod = 0;    // semitones from the modulators, per block
+    }
+    // play the settings of line src (its own, or line 1's for 1+1′); envelopes follow
+    use(src) {
+      if (src === this.src) return;
+      this.src = src; this.ix = lineIndex(src);
+      for (const [env, n] of [[this.wenv, 'wenv'], [this.senv, 'senv'], [this.aenv, 'aenv'], [this.penv, 'penv']]) env.base = PINDEX[n + src + 't1'];
+    }
+    trigger(wasActive) {
+      if (!wasActive || !this.on) { this.ph = 0; this.odd = 0; this.aenv.v = 0; this.wenv.v = 0; this.senv.v = 0; this.penv.v = 0; }
+      this.wenv.trigger(); this.senv.trigger(); this.aenv.trigger(); this.penv.trigger();
+      if (!wasActive || !this.on) { this.snap = true; this.primeDc(); }
+      this.on = true;
+    }
+    release() {
+      this.wenv.release(); this.senv.release(); this.aenv.release(); this.penv.release();
+      if (this.aenv.done && this.aenv.v > 0) this.aenv.fade(0.01);
+    }
+    done() { return !this.on || (this.aenv.done && (!this.voice.held || this.aenv.v === 0)); }
+    // everything that is fixed for one block: pitch, waves, Warp and Shape scaling, the shaper
+    settings() {
+      const e = this.eng, v = this.voice, P = v.vp, I = this.ix, k = this.k;
+      // pitch: the voice's note, then this line's octave, fifth, detune, pitch envelope and modulation
+      // (all zero adds nothing, so a plain line is exactly as before)
+      let st = P[I.octave] * 12 + P[I.fifth] * 7 + P[I.detune] / 100 + P[I.penvdepth] * this.penv.v + this.pitchMod;
+      if (this.L === 2) st += P[PINDEX.octave2] * 12 - P[I.octave] * 12 + P[PINDEX.fifth2] * 7 - P[I.fifth] * 7 + P[PINDEX.detune2] / 100 - P[I.detune] / 100;
+      const hz = 440 * Math.pow(2, v.oct + e.pitchOct + st / 12), note = 69 + 12 * v.oct;
+      k.hz = hz; k.inc = hz / e.srOS;
+      const vl = 1 - v.vel;
+      k.vw = (1 - P[I.velwarp] * vl) * Math.min(1, Math.pow(2, -P[I.warpkey] * (note - 60) / 12));
+      k.vs = (1 - P[I.velshape] * vl) * Math.min(1, Math.pow(2, -P[I.shapekey] * (note - 60) / 12));
+      k.va = (1 - P[I.velamp] * vl) * LEVEL * Math.pow(10, P[I.level] / 20) * v.mixGain;
+      k.wbase = P[I.warp]; k.wdepth = P[I.wenvdepth];
+      k.sbase = P[I.shape]; k.sdepth = P[I.senvdepth]; k.link = P[I.link];
+      k.order = Math.round(P[I.order]); k.tm = P[I.ordermorph];
+      // Twist depth in cycles, before the shaper's steepening divides it (in render)
+      // The last quarter of the knob deepens it up to 4 times: the steady range ends near ¾, and above
+      // it the loop breaks into controlled chaos (design.md §7)
+      const tw = P[I.twist], over = Math.max(0, (tw - 0.75) / 0.25);
+      k.twist = tw * (1 + 3 * over * over) * TWIST_MAX * Math.min(1, Math.sqrt(TWIST_REF / hz));
+      k.def = Math.round(P[I.swmode]); k.way = Math.round(P[I.morphway]);
+      this.pre.def = k.def;
+      const pr = Math.round(P[I.pair]);
+      k.w0 = Math.round(P[I.wave]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[I.window]);
+      k.fam = Math.round(P[I.wfamily]);
+      k.vx = P[I.vecx]; k.vy = P[I.vecy]; k.curve = Math.round(P[I.curve]); k.ratio = P[I.ratio];
+      if (k.fam > 0) { const wf = k.fam === 1 ? 7 : k.fam === 3 ? 11 : 8 + k.curve; k.w0 = k.w1 = wf; }   // no wave pairs outside CZ
+      // pitch cap: the steepest slope SLOPE/p never reads the cosine faster than WARP_FMAX
+      k.cap = Math.max(SLOPE[k.w0], SLOPE[k.w1]) * hz / (WARP_FMAX * e.srOS);
+      k.kHost = RESO_NYQ * e.sr / hz; k.kOS = RESO_OS * e.srOS / hz; k.lnReso = Math.log(RESO_MAX);
+      k.fr = hz / e.srOS;                 // the note as a share of the internal rate
+      // where the wave can jump or kink (see render)
+      k.splitP = k.w0 === 6 || k.w1 === 6;
+      k.splitD = k.w0 === 7;                // Vector kinks at d
+      k.splitHalf = k.win >= 2;
+      k.splitEnd = k.win !== 0 || k.w0 === 5 || k.w1 === 5 || k.splitP || k.w0 === 11;   // Sync jumps at the end   // Double pulse at p = ½ jumps at the end
+      // the shaper
+      const sh = this.sh;
+      sh.ver++;
+      sh.fam = Math.round(P[I.sfamily]); sh.bias = P[I.bias];
+      sh.sub = sh.fam === 1 ? Math.round(P[I.fold]) : sh.fam === 2 ? Math.round(P[I.sat]) : 0;
+      if (sh.fam === 0) {
+        const h = e.harm;
+        for (let i = 0; i < NH; i++) h[i] = P[I.h1 + i];
+        chebWeights(sh.e, h, P[I.tilt], P[I.oddeven]);
+      } else if (sh.fam === 3) {
+        const c = e.curves[this.src - 1];
+        morphCurves(sh, c.keys, c.F, Math.round(P[I.keys]), P[I.morph]);
+      }
+      return k;
+    }
+    // pivot and resonance ratio for Warp amount a and shaper steepening E, into this.wp, this.wk; and
+    // the wave's fastest frequency as a share of the internal rate (for the Chebyshev band limit)
+    warpPoint(a, E) {
+      const k = this.k;
+      if (k.fam > 0) {
+        warpFamily(this.wo, k.fam, k.curve, a, k.vx, k.vy, k.ratio, WARP_FMAX / (k.fr * E), Math.min(k.kHost, k.kOS / E));
+        this.wp = this.wo.p; this.wk = this.wo.k;
+        this.sh.fpk = k.fr * maxSlope(k.w0, this.wp, this.wk);
+        return;
+      }
+      this.wp = Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), Math.min(0.5, k.cap * E));
+      this.wk = Math.max(1, Math.min(Math.pow(RESO_MAX, a), k.kHost, k.kOS / E));
+      this.sh.fpk = k.fr * Math.max(maxSlope(k.w0, this.wp, this.wk), maxSlope(k.w1, this.wp, this.wk));
+    }
+    // Shape s shared between the shaper on the phase (pre.s) and after the warp (sPost), by order.
+    // Morph through the warp: the shaper leaves the output (0 → ½) and enters the phase (½ → 1), so the
+    // middle is the warp alone. Morph shared: Shape is split between the two all the way.
+    // Returns how much the two together steepen the wave (for the pitch cap).
+    orderSplit(s) {
+      const k = this.k, sh = this.sh;
+      let a = 0, b = s;
+      if (k.order === 1) { a = s; b = 0; }
+      else if (k.order === 2) {
+        const t = k.tm;
+        if (k.way === 0) { a = s * Math.max(0, 2 * t - 1); b = s * Math.max(0, 1 - 2 * t); }
+        else { a = s * t; b = s * (1 - t); }
+      }
+      // the shaper on the phase steepens the phase itself: hold it under the pitch cap on its own
+      // (Chebyshev harmonic 16 on the ramp steepens it 256 times: −32 dB of aliasing at MIDI 48)
+      let ep = expansionPre(sh, a, k.def);
+      const lim = Math.max(1, WARP_FMAX / k.fr);
+      if (ep > lim) {
+        let lo = 0, hi = a;
+        for (let i = 0; i < 12; i++) { const m = 0.5 * (lo + hi); if (expansionPre(sh, m, k.def) > lim) hi = m; else lo = m; }
+        a = lo; ep = expansionPre(sh, a, k.def);
+      }
+      this.pre.s = a; this.sPost = b;
+      return ep * expansion(sh, b);
+    }
+    warpAt(we) { const k = this.k, a = clamp(k.wbase + k.wdepth * we, 0, 1) * k.vw; return a; }
+    shapeAt(we, se) { const k = this.k; return clamp(k.sbase + k.sdepth * se + k.link * we, 0, 1) * k.vs; }
+    // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on,
+    // and the level at the wave's own
+    primeDc() {
+      const k = this.settings(), s0 = this.shapeAt(0, 0);
+      this.warpPoint(this.warpAt(0), this.orderSplit(s0));
+      const p = this.wp, kr = this.wk;
+      const l = levelOf(k.w0, k.w1, k.win, p, kr, this.sh, this.sPost, this.pre);
+      this.dcx = l.mean; this.dcy = 0; this.gain = levelGain(l);
+      // the band-limiting pipeline starts at the wave's first value, with nothing pending
+      this.x1 = waveAt(k.w0, k.win, 0, p, kr, this.pre);
+      this.q0 = shapeSample(this.sh, this.x1, this.sPost); this.carry = 0;
+      // Twist's loop starts empty
+      this.toff = 0; this.tp = this.q0; this.tlp = 0; this.E = 1;
+    }
+    // one piece of a split sample: ADAA from xa to the wave just before phase b0 on wave wa, over a
+    // share dt of the sample; then the shaped jump and kink at the breakpoint (tb into the sample),
+    // whose residuals go to the last sample, this one and the next. Returns the wave just after
+    // phase b1 on wave wb (the next piece's start).
+    piece(xa, wa, b0, wb, b1, dt, tb, p, kr, s, inc) {
+      const win = this.k.win, sh = this.sh, e = 1e-12, d = 1e-3 * inc;
+      const pre = this.pre;
+      const xb = waveAt(wa, win, b0 - e, p, kr, pre), xc = waveAt(wb, win, b1 + e, p, kr, pre);
+      this.acc += dt * shapeADAA(sh, xa, xb, s);
+      const ya = shapeSample(sh, xb, s), yb = shapeSample(sh, xc, s);
+      const sa = (ya - shapeSample(sh, waveAt(wa, win, b0 - e - d, p, kr, pre), s)) * 1e3;
+      const sb = (shapeSample(sh, waveAt(wb, win, b1 + e + d, p, kr, pre), s) - yb) * 1e3;
+      const r = residuals(tb, yb - ya, sb - sa);
+      this.rm += r.m; this.ro += r.o; this.rp += r.p;
+      return xc;
+    }
+    // render n internal samples, adding into out; raw (if given) gets the line's wave at its level but
+    // without the amp envelope, for ring modulation
+    render(n, out, raw) {
+      const e = this.eng, v = this.voice;
+      const k = this.settings(), sh = this.sh;
+      const { vw, vs, va, wbase, wdepth, sbase, sdepth, link, w0, w1, win } = k;
+      // pitch moves smoothly across the block (a glide steps once per block otherwise, and the pitch cap
+      // that follows it put a whistle at −49 dB near 12 kHz); a new note starts at its own pitch
+      const fr1 = k.fr, cap1 = k.cap, kHost1 = k.kHost, kOS1 = k.kOS;
+      const fr0 = this.snap || !(this.frPrev > 0) ? fr1 : this.frPrev, dfr = (fr1 - fr0) / n;
+      this.snap = false; this.frPrev = fr1;
+      const R = e.dcR;
+      // level: measured at the Warp and Shape the block starts with, moved to across the block
+      const sb0 = this.shapeAt(this.wenv.v, this.senv.v);
+      this.warpPoint(this.warpAt(this.wenv.v), this.orderSplit(sb0));
+      const g1 = levelGain(levelOf(w0, w1, win, this.wp, this.wk, sh, this.sPost, this.pre));
+      const pre = this.pre;
+      let g = this.gain;
+      const dg = (g1 - g) / n;
+      let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
+      const wenv = this.wenv, senv = this.senv, aenv = this.aenv, penv = this.penv;
+      let wa = NaN, ws = NaN;
+      const twist = k.twist, twE = 1 + TWO_PI * Math.min(twist, TWIST_MAX);
+      if (!twist) this.toff = 0;
+      for (let i = 0; i < n; i++) {
+        const fri = fr0 + dfr * (i + 1), q = fri / fr1;
+        // CZ noise: line 2's pitch jumps by up to ±90% each sample (the voice's own seeded generator)
+        const inc = this.noise ? fri * (1 + NOISE_DEPTH * v.rand()) : fri;
+        k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
+        const we = wenv.next(), se = senv.next(), ae = aenv.next(); penv.next();
+        const a = clamp(wbase + wdepth * we, 0, 1) * vw;
+        const sAll = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
+        // the pivot, resonance ratio and band limit only change when Warp, Shape or the pitch does
+        // (Twist speeds the read phase up by up to 1 + 2π·depth: the warp's cap counts that too)
+        if (a !== wa || sAll !== ws || dfr !== 0) { const E = this.orderSplit(sAll); this.E = E; this.warpPoint(a, E * twE); wa = a; ws = sAll; }
+        const s = this.sPost;
+        const p = this.wp, kr = this.wk;
+        // advance the phase; the new sample x0 is the naive wave
+        const prev = ph, wPrev = odd ? w1 : w0;
+        ph += inc;
+        let wrapped = false;
+        if (ph >= 1) { ph -= 1; odd ^= 1; wrapped = true; }
+        const w = odd ? w1 : w0;
+        // Twist: the warp reads the phase moved by the fed-back shaped wave
+        let x0;
+        if (twist) { const r = ph + this.toff; x0 = waveAt(w, win, ph, p, kr, pre, r - Math.floor(r)); }
+        else x0 = pre.s > 0 ? waveAt(w, win, ph, p, kr, pre) : 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
+        // band limit: the shaped wave averaged over the sample (first-order ADAA, a box filter). Where the
+        // wave jumps or kinks inside the sample, the sample is split there and each piece is averaged on
+        // its own, so a jump goes through the shaper as the jump it is, not as a line through the values
+        // between; the jump and kink then get second-order residuals. The CZ waves are smooth at their
+        // own breakpoints (the cosine is flat there), so only these split: Double pulse at p and ½ + p,
+        // Resonance at the end of the cycle (hard sync), and a window at ½ and at the end of the cycle.
+        // (Splitting where the wave is smooth made the steep peaks alias more: −32 instead of −66 dB.)
+        const B = this.bps;
+        // (Shape → Warp A picks the other branch of acos at ½, so the phase can jump there too)
+        B[0] = k.splitP || k.splitD ? p : 2; B[1] = k.splitHalf || (pre.s > 0 && pre.def === 0) ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
+        const end = wrapped ? 1 : ph;
+        // with the shaper on the phase, the wave may also jump at the end of the cycle
+        const splitEnd = k.splitEnd || pre.s > 0;
+        let split = wrapped && splitEnd;
+        for (let j = 0; j < 3; j++) if (B[j] < 1 && B[j] > prev && B[j] <= end) { split = true; break; }
+        // with Twist the read phase can run backwards, so breakpoints are not where time puts them:
+        // no splitting; Twist relies on the oversampling and its own low-pass (design.md §7)
+        if (twist) split = false;
+        let cur;
+        this.rm = 0; this.ro = 0; this.rp = 0;
+        if (!split) cur = shapeADAA(sh, x1, x0, s);
+        else {
+          this.acc = 0;
+          let xa = x1, tp = 0;
+          for (let j = 0; j < 3; j++) {
+            const b = B[j];
+            if (b < 1 && b > prev && b <= end) { const t = (b - prev) / inc; xa = this.piece(xa, wPrev, b, wPrev, b, t - tp, t, p, kr, s, inc); tp = t; }
+          }
+          if (wrapped) {
+            const t = (1 - prev) / inc;
+            if (splitEnd) { xa = this.piece(xa, wPrev, 1, w, 0, t - tp, t, p, kr, s, inc); tp = t; }
+            for (let j = 0; j < 3; j++) {
+              const b = B[j];
+              if (b < 1 && b <= ph) { const t = (1 - prev + b) / inc; xa = this.piece(xa, w, b, w, b, t - tp, t, p, kr, s, inc); tp = t; }
+            }
+          }
+          this.acc += (1 - tp) * shapeADAA(sh, xa, x0, s);
+          cur = this.acc;
+        }
+        x1 = x0;
+        if (twist) {
+          // the loop: the shaped wave averaged over its last two samples (the DX7's anti-hunting
+          // filter), low-passed, soft-limited, scaled. Depth falls with the shaper's steepening and
+          // with pitch. No DC blocker in the loop: there is no integrator, so DC can only shift the
+          // phase by a fixed amount, never build up (the design had one; it adds nothing).
+          const t = cur;
+          const avg = 0.5 * (t + this.tp); this.tp = t;
+          this.tlp += TWIST_LPA * (avg - this.tlp);
+          // depth is divided by how much the warp and the shaper multiply a phase shift (a Resonance
+          // ratio of 17 turns a shift of the phase into 17 times that in the wave): Twist is then the
+          // same feedback index on every wave, instead of chaos at a quarter for steep ones
+          this.toff = twist / (this.E * Math.max(1, sh.fpk / k.fr)) * Math.tanh(this.tlp);
+        }
+        // one more sample of delay, so a breakpoint can correct the sample before it: x is the last
+        // sample, finished now
+        const x = this.q0 + this.rm;
+        this.q0 = cur + this.carry + this.ro; this.carry = this.rp;
+        const y = x - dcx + R * dcy; dcx = x; dcy = y;
+        g += dg;
+        out[i] += y * ae * ae * g * va;
+        if (raw) raw[i] = y * g;
+      }
+      this.gain = g1;
+      this.ph = ph; this.odd = odd; this.x1 = x1;
+      this.dcx = dcx; this.dcy = Math.abs(dcy) < 1e-20 ? 0 : dcy;
+      if (aenv.done && (!v.held || aenv.v === 0)) this.on = false;
+    }
+  }
+
+  /* ---------- one voice: two lines and the modulators ---------- */
+  const LINE_SELECT = ['1', '2', '1+1′', '1+2'];
+  const NOISE_DEPTH = 0.9;
+  const RING_GAIN = 2;       // a product of two waves is quieter than either
+  const MIX2 = Math.SQRT1_2; // two lines together: each 3 dB down
+  class Voice {
+    constructor(eng, seed) {
+      this.eng = eng;
+      this.note = -1; this.held = false; this.active = false; this.age = 0;
+      this.vel = 1; this.oct = 0; this.targetOct = 0; this.glideStep = 0;
+      this.vp = new Float64Array(PARAMS.length);       // the parameters with this voice's modulation
+      this.mixGain = 1;
+      this.lines = [new Line(this, 1), new Line(this, 2)];
+      this.tmp = new Float32Array(BLOCK * OS); this.raw = new Float32Array(BLOCK * OS);
+      this.rng = seed >>> 0 || 1;
+      this.lfoPh = [0, 0]; this.lfoSH = [0, 0]; this.lfoPrev = [0, 0];
+      this.menv = [new Env(eng, 'menv1'), new Env(eng, 'menv2')];
+      this.acc = new Float64Array(NDEST);
+      this.vp.set(eng.p);
+    }
+    // xorshift32 → −1 … 1
+    rand() {
+      let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0;
+      return this.rng / 2147483648 - 1;
+    }
+    // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
+    setTarget(note, glide) {
+      this.note = note;
+      this.targetOct = (note - 69) / 12;
+      const g = this.eng.p[PINDEX.glide];
+      if (!glide || g <= 0) { this.oct = this.targetOct; this.glideStep = 0; for (const l of this.lines) l.snap = true; }
+      else this.glideStep = Math.abs(this.targetOct - this.oct) / (g * this.eng.srOS);
+    }
+    // which lines sound, and whose settings each plays
+    routing() {
+      const P = this.eng.p, sel = Math.round(P[PINDEX.lines]);
+      const [l1, l2] = this.lines;
+      l2.use(sel === 2 ? 1 : 2);
+      this.use1 = sel !== 1; this.use2 = sel !== 0;
+      this.mixGain = this.use1 && this.use2 ? MIX2 : 1;
+      l2.noise = P[PINDEX.noise] >= 0.5 && this.use2;
+      this.ringOn = P[PINDEX.ring] >= 0.5 && this.use1 && this.use2;
+    }
+    trigger(vel) {
+      const wasActive = this.active;
+      this.vel = clamp(vel / 127, 0, 1);
+      this.active = true; this.held = true; this.age = ++this.eng.ageCounter;
+      const P = this.eng.p;
+      if (!wasActive) {
+        for (let j = 0; j < 2; j++) {
+          if (P[PINDEX['lfo' + (j + 1) + 'retrig']] >= 0.5) { this.lfoPh[j] = 0; this.lfoSH[j] = this.rand(); }
+          this.menv[j].v = 0;
+        }
+      }
+      for (const m of this.menv) m.trigger();
+      this.routing();
+      this.modulate(0);
+      if (this.use1) this.lines[0].trigger(wasActive); else this.lines[0].on = false;
+      if (this.use2) this.lines[1].trigger(wasActive); else this.lines[1].on = false;
+    }
+    release() {
+      if (!this.held) return;
+      this.held = false;
+      for (const l of this.lines) if (l.on) l.release();
+      for (const m of this.menv) m.release();
+    }
+    // The modulators, once per block: each adds depth × its value to its destinations, in knob
+    // positions (0–1), and pitch in semitones (±12 at depth 1). n: internal samples since the last call.
+    modulate(n) {
+      const e = this.eng, P = e.p, acc = this.acc, vp = this.vp;
+      vp.set(P);
+      acc.fill(0);
+      let any = false;
+      const add = (dest, depth, m) => { if (dest > 0 && depth !== 0) { acc[dest] += depth * m; any = true; } };
+      for (let j = 0; j < 2; j++) {
+        const b = 'lfo' + (j + 1);
+        const d1 = P[PINDEX[b + 'dest1']], d2 = P[PINDEX[b + 'dest2']];
+        // advance the LFO
+        const rate = P[PINDEX[b + 'sync']] >= 0.5 ? e.tempo / 60 / SYNC_BEATS[Math.round(P[PINDEX[b + 'div']])] : P[PINDEX[b + 'rate']];
+        let ph = this.lfoPh[j] + rate * n / e.srOS;
+        if (ph >= 1) { ph -= Math.floor(ph); this.lfoSH[j] = this.rand(); }
+        this.lfoPh[j] = ph;
+        if (d1 <= 0 && d2 <= 0) continue;
+        let m;
+        switch (Math.round(P[PINDEX[b + 'shape']])) {
+          case 1: m = 1 - 4 * Math.abs(ph - 0.5); break;          // triangle
+          case 2: m = 2 * ph - 1; break;                          // saw up
+          case 3: m = ph < 0.5 ? 1 : -1; break;                   // square
+          case 4: m = this.lfoSH[j]; break;                       // random (sample and hold)
+          default: m = Math.sin(TWO_PI * ph);                     // sine
+        }
+        add(Math.round(d1), P[PINDEX[b + 'depth1']], m); add(Math.round(d2), P[PINDEX[b + 'depth2']], m);
+      }
+      for (let j = 0; j < 2; j++) {
+        const b = 'menv' + (j + 1), env = this.menv[j];
+        for (let i = 0; i < n; i++) env.next();
+        add(Math.round(P[PINDEX[b + 'dest1']]), P[PINDEX[b + 'depth1']], env.v);
+        add(Math.round(P[PINDEX[b + 'dest2']]), P[PINDEX[b + 'depth2']], env.v);
+      }
+      add(Math.round(P[PINDEX.wheeldest]), P[PINDEX.wheeldepth], e.wheel);
+      add(Math.round(P[PINDEX.atdest]), P[PINDEX.atdepth], e.aftertouch);
+      this.lines[0].pitchMod = 0; this.lines[1].pitchMod = 0;
+      if (!any) return;
+      for (let dest = 1; dest < NDEST; dest++) {
+        const a = acc[dest];
+        if (a === 0) continue;
+        const name = DEST_IDS[Math.floor((dest - 1) / 3)], which = (dest - 1) % 3;
+        for (let L = 1; L <= 2; L++) {
+          if (which !== 0 && which !== L) continue;
+          if (name === 'pitch') { this.lines[L - 1].pitchMod += 12 * a; continue; }
+          // a line playing line 1's settings (1+1′) follows line 1's modulation
+          const idx = PINDEX[name + L], d = PARAMS[idx];
+          vp[idx] = fromNorm(d, clamp(toNorm(d, vp[idx]) + a, 0, 1));
+        }
+      }
+    }
+    render(n, out) {
+      // glide (mono): pitch moves toward the target, per block
+      const dOct = this.targetOct - this.oct, step = this.glideStep * n;
+      this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
+      this.routing();
+      this.modulate(n);
+      const [l1, l2] = this.lines;
+      if (this.ringOn && l1.on && l2.on) {
+        // ring: line 2 (with its own envelope) times line 1's wave
+        const tmp = this.tmp, raw = this.raw;
+        l1.render(n, out, raw);
+        tmp.fill(0);
+        l2.render(n, tmp, null);
+        for (let i = 0; i < n; i++) out[i] += tmp[i] * raw[i] * RING_GAIN;
+      } else {
+        if (l1.on) l1.render(n, out, null);
+        if (l2.on) l2.render(n, out, null);
+      }
+      if (l1.done() && l2.done()) { this.active = false; this.held = false; l1.on = false; l2.on = false; }
+    }
+  }
+
+
+  /* ---------- the engine ---------- */
+  class PretzelEngine {
+    constructor(sampleRate, seed) {
+      this.sr = sampleRate; this.srOS = sampleRate * OS;
+      this.seed = (seed >>> 0) || 0x9e3779b9;   // per-voice generators: Noise, random LFO
+      this.p = new Float64Array(PARAMS.length);
+      PARAMS.forEach((d, i) => { this.p[i] = d.def; });
+      this.fir = makeFir();
+      this.hist = new Float32Array(FIR_LEN * 2); this.hw = 0;
+      this.os = new Float32Array(BLOCK * OS);
+      this.blkL = new Float32Array(BLOCK); this.blkR = new Float32Array(BLOCK); this.blkPos = BLOCK;
+      this.ageCounter = 0; this.quietBlocks = 0;
+      this.stack = [];
+      this.bendNorm = 0; this.pitchOct = 0;
+      this.dcR = 1 - TWO_PI * DC_HZ / this.srOS;
+      this.dc = { x: 0, y: 0, R: 1 - TWO_PI * 10 / sampleRate };
+      this.volSm = Math.pow(10, PARAMS[PINDEX.volume].def / 20);
+      this.smooth = 1 - Math.exp(-BLOCK / (0.02 * sampleRate));
+      this.harm = new Float64Array(NH);
+      // drawn keyframes per line, with their antiderivatives
+      this.curves = [0, 1].map(() => {
+        const keys = DEFAULT_CURVES.map((y) => Float64Array.from(y));
+        return { keys, F: keys.map(antiderivative) };
+      });
+      this.wheel = 0; this.aftertouch = 0; this.tempo = 120;
+      this.voices = [];
+      for (let i = 0; i < MAX_VOICES; i++) this.voices.push(new Voice(this, (this.seed + i * 0x6d2b79f5) >>> 0));
+      this.info = { voices: 0, idle: true };
+    }
+
+    static get LATENCY() { return BLOCK; }
+    static get PARAMS() { return PARAMS; }
+
+    setParam(id, v) {
+      const i = PINDEX[id];
+      if (i === undefined || !Number.isFinite(v)) return;
+      const d = PARAMS[i];
+      this.p[i] = clamp(d.step ? Math.round(v / d.step) * d.step : v, d.min, d.max);
+      if (id === 'mode') this.allNotesOff();
+    }
+    getParam(id) { return this.p[PINDEX[id]]; }
+    // a drawn keyframe: points [[x, y], …] with x and y in −1 … 1; smooth: Catmull-Rom, else straight
+    setCurve(line, key, points, smooth) {
+      const c = this.curves[line - 1];
+      if (!c || key < 0 || key >= MAX_KEYS || !points || points.length < 2) return;
+      c.keys[key] = curveTable(points.map(([x, y]) => [clamp(x, -1, 1), clamp(y, -1, 1)]), smooth);
+      c.F[key] = antiderivative(c.keys[key]);
+    }
+    setBend(norm) { this.bendNorm = clamp(norm, -1, 1); }
+    setModWheel(v) { this.wheel = clamp(v, 0, 1); }
+    setAftertouch(v) { this.aftertouch = clamp(v, 0, 1); }
+    setTempo(bpm) { this.tempo = clamp(bpm, 20, 400); }
+
+    noteOn(note, vel) {
+      if (vel <= 0) { this.noteOff(note); return; }
+      if (this.p[PINDEX.mode] === 0) {
+        const v = this.voices[0];
+        const i = this.stack.indexOf(note); if (i >= 0) this.stack.splice(i, 1);
+        this.stack.push(note);
+        const legato = v.active && v.held;
+        v.setTarget(note, legato && this.p[PINDEX.glide] > 0);
+        if (!legato) { v.setTarget(note, false); v.trigger(vel); }
+        return;
+      }
+      for (const v of this.voices) if (v.active && v.note === note) { v.setTarget(note, false); v.trigger(vel); return; }
+      let pick = null;
+      for (const v of this.voices) if (!v.active) { pick = v; break; }
+      if (!pick) { for (const v of this.voices) if (!v.held && (!pick || v.age < pick.age)) pick = v; }
+      if (!pick) { for (const v of this.voices) if (!pick || v.age < pick.age) pick = v; }
+      pick.setTarget(note, false);
+      pick.trigger(vel);
+    }
+    noteOff(note) {
+      if (this.p[PINDEX.mode] === 0) {
+        const i = this.stack.indexOf(note); if (i >= 0) this.stack.splice(i, 1);
+        const v = this.voices[0];
+        if (!v.active || v.note !== note) return;
+        if (this.stack.length) v.setTarget(this.stack[this.stack.length - 1], this.p[PINDEX.glide] > 0);
+        else v.release();
+        return;
+      }
+      for (const v of this.voices) if (v.note === note && v.held) v.release();
+    }
+    allNotesOff() {
+      this.stack.length = 0;
+      for (const v of this.voices) v.release();
+    }
+
+    processBlock() {
+      const d = this.dc;
+      const busy = this.voices.some(v => v.active);
+      if (!busy && this.quietBlocks > 0 && Math.abs(d.y) < 1e-12 && Math.abs(d.x) < 1e-12) {
+        this.blkL.fill(0); this.blkR.fill(0); d.x = d.y = 0;
+        this.info.voices = 0; this.info.idle = true;
+        return;
+      }
+      this.pitchOct = this.p[PINDEX.transpose] / 12 + this.bendNorm * this.p[PINDEX.bendrange] / 12;
+      this.volSm += (Math.pow(10, this.p[PINDEX.volume] / 20) - this.volSm) * this.smooth;
+      const nOS = BLOCK * OS, o = this.os;
+      o.fill(0);
+      let count = 0;
+      for (const v of this.voices) if (v.active) { v.render(nOS, o); count++; }
+      this.quietBlocks = count === 0 ? this.quietBlocks + 1 : 0;
+      this.info.voices = count; this.info.idle = false;
+      // decimate (symmetric FIR), DC block, volume, clip; mono for now, same on both sides
+      const L = FIR_LEN, H = FIR_LEN / 2, h = this.fir, hs = this.hist, vol = this.volSm;
+      let hw = this.hw;
+      for (let j = 0, k = 0; j < BLOCK; j++) {
+        for (let q = 0; q < OS; q++, k++) { hs[hw] = hs[hw + L] = o[k]; hw = hw + 1 === L ? 0 : hw + 1; }
+        let acc = 0;
+        for (let t = 0, u = hw + L - 1; t < H; t++, u--) acc += h[t] * (hs[hw + t] + hs[u]);
+        const y = acc - d.x + d.R * d.y; d.x = acc; d.y = y;
+        const s = y * vol;
+        this.blkL[j] = this.blkR[j] = s > 1 ? 1 : s < -1 ? -1 : s;
+      }
+      this.hw = hw;
+      if (Math.abs(d.y) < 1e-20) d.y = 0;
+    }
+
+    // host calls with any n; work happens in fixed BLOCK chunks
+    process(outL, outR, n) {
+      let pos = this.blkPos;
+      for (let j = 0; j < n; j++) {
+        if (pos === BLOCK) { this.processBlock(); pos = 0; }
+        outL[j] = this.blkL[pos];
+        if (outR) outR[j] = this.blkR[pos];
+        pos++;
+      }
+      this.blkPos = pos;
+    }
+  }
+
+  PretzelEngine.BLOCK = BLOCK; PretzelEngine.OS = OS; PretzelEngine.MAX_VOICES = MAX_VOICES;
+  PretzelEngine.toNorm = toNorm; PretzelEngine.fromNorm = fromNorm;
+  PretzelEngine.core = core;      // for the bench's live view (it draws the waves with the engine's own functions)
+  if (typeof module !== 'undefined' && module.exports) module.exports = { PretzelEngine, PARAMS, core, DEST_IDS, NDEST, destName, LINE_SELECT, LFO_SHAPES, SYNC_BEATS };
+  else root.PretzelEngine = PretzelEngine;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+/* AudioWorklet wrapper: pretzel engine → stereo output, plus the data for the live view.
+   Runs after pretzel-engine.js, which leaves PretzelEngine on the worklet's global scope. */
+const VIEW_N = 256;     // points per cycle in the live view
+const XFER_N = 65;      // points on the transfer curve
+class PretzelProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.eng = new PretzelEngine(sampleRate, 1234);
+    this.all = this.eng.voices.slice();
+    this.setVoices(4);
+    this.core = PretzelEngine.core;
+    this.vizEvery = Math.round(sampleRate / 30); this.vizCount = 0;
+    // a test preset's phrase, played to the sample as tools/render-presets.js does
+    this.ev = null; this.evAt = 0; this.evPos = 0; this.sweeps = null;
+    this.moved = {};      // parameters the phrase moved since the last frame, so the page's knobs follow
+    // DSP load: time spent in the engine / length of audio produced
+    this.hiRes = typeof performance !== 'undefined' && typeof performance.now === 'function';
+    this.clock = this.hiRes ? () => performance.now() : () => Date.now();
+    this.busyMs = 0; this.audioMs = 0; this.load = 0; this.peak = 0; this.winPeak = 0; this.peakAge = 0;
+    this.port.onmessage = (e) => {
+      const m = e.data, eng = this.eng;
+      if (m.t === 'p') eng.setParam(m.id, m.v);
+      else if (m.t === 'many') { for (const k in m.p) eng.setParam(k, m.p[k]); }
+      else if (m.t === 'on') eng.noteOn(m.n, m.v);
+      else if (m.t === 'off') eng.noteOff(m.n);
+      else if (m.t === 'bend') eng.setBend(m.v);
+      else if (m.t === 'wheel') eng.setModWheel(m.v);
+      else if (m.t === 'press') eng.setAftertouch(m.v);
+      else if (m.t === 'tempo') eng.setTempo(m.v);
+      else if (m.t === 'curve') eng.setCurve(m.line, m.key, m.pts, true);
+      else if (m.t === 'voices') { eng.allNotesOff(); this.setVoices(m.n); }
+      else if (m.t === 'play') this.play(m.pr);
+      else if (m.t === 'panic') { this.ev = null; this.sweeps = null; eng.allNotesOff(); }
+    };
+    this.port.postMessage({ t: 'ready', sr: sampleRate });
+  }
+  // the bench can play fewer voices than the engine has (design.md §14): new notes then steal sooner
+  setVoices(n) {
+    for (const v of this.all) if (v.active) { v.release(); }
+    this.eng.voices = this.all.slice(0, Math.max(1, Math.min(this.all.length, n)));
+    for (const v of this.all.slice(this.eng.voices.length)) { v.active = false; v.held = false; for (const l of v.lines) l.on = false; }
+  }
+  play(pr) {
+    const ev = [];
+    for (const [note, t, d, vel] of pr.phrase) { ev.push([Math.round(t * sampleRate), 1, note, vel || 100]); ev.push([Math.round((t + d) * sampleRate), 0, note]); }
+    for (const s of pr.steps || []) ev.push([Math.round(s.time * sampleRate), 2, s.params]);
+    ev.sort((a, b) => a[0] - b[0] || (a[1] === 2 ? -1 : b[1] === 2 ? 1 : a[1] - b[1]));
+    this.ev = ev; this.evPos = 0; this.evAt = 0; this.sweeps = pr.sweeps || null;
+    this.eng.allNotesOff();
+  }
+  // events of the playing phrase that fall in the next n samples (whole blocks, as the renderer does)
+  runPhrase(n) {
+    const e = this.eng, ev = this.ev;
+    while (this.evPos < ev.length && ev[this.evPos][0] < this.evAt + n) {
+      const [, type, a, b] = ev[this.evPos++];
+      if (type === 1) e.noteOn(a, b); else if (type === 0) e.noteOff(a); else for (const id in a) { e.setParam(id, a[id]); this.moved[id] = a[id]; }
+    }
+    if (this.sweeps) {
+      const t = this.evAt / sampleRate, bl = n / sampleRate;
+      for (const sw of this.sweeps) if (t >= sw.start - bl && t <= sw.end + bl) {
+        const v = sw.from + (sw.to - sw.from) * Math.min(1, Math.max(0, (t - sw.start) / (sw.end - sw.start)));
+        if (sw.id === 'wheel') e.setModWheel(v); else if (sw.id === 'aftertouch') e.setAftertouch(v); else e.setParam(sw.id, v);
+        this.moved[sw.id] = v;
+      }
+    }
+    this.evAt += n;
+    if (this.evPos >= ev.length && (!this.sweeps || this.sweeps.every((s) => this.evAt / sampleRate > s.end + 0.05))) { this.ev = null; this.sweeps = null; this.port.postMessage({ t: 'done' }); }
+  }
+  // one line of a voice as the live view draws it: the wave over one cycle, the phase the warp reads
+  // (with the shaper on the phase), and the transfer curve at the Shape it has now
+  lineView(ln) {
+    const c = this.core, k = ln.k, pre = ln.pre, sh = ln.sh, s = ln.sPost, p = ln.wp, kr = ln.wk;
+    const w = k.w0, win = k.win, toff = k.twist ? ln.toff : 0;
+    const wave = new Float32Array(VIEW_N), read = new Float32Array(VIEW_N), xfer = new Float32Array(XFER_N);
+    for (let i = 0; i < VIEW_N; i++) {
+      const ph = i / VIEW_N, r0 = ph + toff, r = r0 - Math.floor(r0);
+      const u = pre.s > 0 ? c.prePhase(sh, r, pre.s, pre.def) : r;
+      read[i] = c.warpU(w, u, p, kr);
+      wave[i] = c.shapeSample(sh, c.waveAt(w, win, ph, p, kr, pre, r), s);
+    }
+    const sAll = pre.s + s;
+    for (let i = 0; i < XFER_N; i++) xfer[i] = c.shapeSample(sh, -1 + 2 * i / (XFER_N - 1), sAll);
+    return { L: ln.L, src: ln.src, hz: k.hz, warp: ln.warpAt(ln.wenv.v), shape: sAll, pre: pre.s, post: s,
+      order: k.order, tm: k.tm, twist: k.twist, toff, amp: ln.aenv.v, wave, read, xfer };
+  }
+  process(inputs, outputs) {
+    const out = outputs[0], l = out[0], r = out[1] || null, n = l.length;
+    const t0 = this.clock();
+    if (this.ev) this.runPhrase(n);
+    this.eng.process(l, r, n);
+    const spent = this.clock() - t0, len = n / sampleRate * 1000;
+    this.busyMs += spent; this.audioMs += len;
+    if (this.hiRes && spent / len > this.winPeak) this.winPeak = spent / len;
+    if (this.audioMs >= 500) {
+      this.load = this.busyMs / this.audioMs; this.busyMs = 0; this.audioMs = 0;
+      if (this.winPeak >= this.peak || ++this.peakAge >= 4) { this.peak = this.winPeak; this.peakAge = 0; }
+      this.winPeak = 0;
+    }
+    this.vizCount += n;
+    if (this.vizCount >= this.vizEvery) {
+      this.vizCount = 0;
+      const e = this.eng;
+      // the newest sounding voice is the one shown
+      let v = null; for (const x of e.voices) if (x.active && (!v || x.age > v.age)) v = x;
+      const msg = { t: 'stat', voices: e.info.voices, max: e.voices.length, load: this.load, peak: this.hiRes ? this.peak : -1, lines: [], moved: this.moved };
+      this.moved = {};
+      if (v) for (const ln of v.lines) if (ln.on) msg.lines.push(this.lineView(ln));
+      this.port.postMessage(msg);
+    }
+    return true;
+  }
+}
+registerProcessor('pretzel-processor', PretzelProcessor);
+
+</script>
+<script>
+window.PRETZEL = {"PARAMS":[{"id":"mode","def":1,"min":0,"max":1,"step":1},{"id":"glide","def":0,"min":0,"max":2,"curve":3},{"id":"lines","def":3,"min":0,"max":3,"step":1},{"id":"ring","def":0,"min":0,"max":1,"step":1},{"id":"noise","def":0,"min":0,"max":1,"step":1},{"id":"level1","def":0,"min":-48,"max":6},{"id":"octave1","def":0,"min":-3,"max":3,"step":1},{"id":"fifth1","def":0,"min":0,"max":1,"step":1},{"id":"detune1","def":0,"min":-100,"max":100},{"id":"penvdepth1","def":0,"min":-24,"max":24},{"id":"wfamily1","def":0,"min":0,"max":3,"step":1},{"id":"wave1","def":0,"min":0,"max":6,"step":1},{"id":"pair1","def":0,"min":0,"max":7,"step":1},{"id":"window1","def":0,"min":0,"max":5,"step":1},{"id":"vecx1","def":0.5,"min":0,"max":1},{"id":"vecy1","def":1.5,"min":0,"max":4},{"id":"curve1","def":1,"min":0,"max":2,"step":1},{"id":"ratio1","def":2,"min":1,"max":16},{"id":"warp1","def":0,"min":0,"max":1},{"id":"warpkey1","def":0.3,"min":0,"max":1},{"id":"wenvdepth1","def":1,"min":-1,"max":1},{"id":"velwarp1","def":0.3,"min":0,"max":1},{"id":"velamp1","def":0.7,"min":0,"max":1},{"id":"sfamily1","def":0,"min":0,"max":3,"step":1},{"id":"shape1","def":0,"min":0,"max":1},{"id":"bias1","def":0,"min":-1,"max":1},{"id":"h1_1","def":1,"min":0,"max":1},{"id":"h2_1","def":0,"min":0,"max":1},{"id":"h3_1","def":0,"min":0,"max":1},{"id":"h4_1","def":0,"min":0,"max":1},{"id":"h5_1","def":0,"min":0,"max":1},{"id":"h6_1","def":0,"min":0,"max":1},{"id":"h7_1","def":0,"min":0,"max":1},{"id":"h8_1","def":0,"min":0,"max":1},{"id":"h9_1","def":0,"min":0,"max":1},{"id":"h10_1","def":0,"min":0,"max":1},{"id":"h11_1","def":0,"min":0,"max":1},{"id":"h12_1","def":0,"min":0,"max":1},{"id":"h13_1","def":0,"min":0,"max":1},{"id":"h14_1","def":0,"min":0,"max":1},{"id":"h15_1","def":0,"min":0,"max":1},{"id":"h16_1","def":0,"min":0,"max":1},{"id":"tilt1","def":0,"min":-1,"max":1},{"id":"oddeven1","def":0,"min":-1,"max":1},{"id":"fold1","def":1,"min":0,"max":2,"step":1},{"id":"sat1","def":0,"min":0,"max":2,"step":1},{"id":"keys1","def":4,"min":2,"max":4,"step":1},{"id":"morph1","def":0,"min":0,"max":1},{"id":"order1","def":0,"min":0,"max":2,"step":1},{"id":"ordermorph1","def":0,"min":0,"max":1},{"id":"swmode1","def":0,"min":0,"max":1,"step":1},{"id":"morphway1","def":0,"min":0,"max":1,"step":1},{"id":"twist1","def":0,"min":0,"max":1},{"id":"shapekey1","def":0.3,"min":0,"max":1},{"id":"senvdepth1","def":0,"min":-1,"max":1},{"id":"link1","def":0,"min":-1,"max":1},{"id":"velshape1","def":0.3,"min":0,"max":1},{"id":"wenv1t1","def":0.02,"min":0,"max":10,"curve":3},{"id":"wenv1l1","def":0.8,"min":0,"max":1},{"id":"wenv1t2","def":0.8,"min":0,"max":10,"curve":3},{"id":"wenv1l2","def":0.4,"min":0,"max":1},{"id":"wenv1t3","def":0.4,"min":0,"max":10,"curve":3},{"id":"wenv1l3","def":0,"min":0,"max":1},{"id":"wenv1t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv1l4","def":0,"min":0,"max":1},{"id":"wenv1t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv1l5","def":0,"min":0,"max":1},{"id":"wenv1t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv1l6","def":0,"min":0,"max":1},{"id":"wenv1t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv1l7","def":0,"min":0,"max":1},{"id":"wenv1t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv1l8","def":0,"min":0,"max":1},{"id":"wenv1sus","def":2,"min":0,"max":8,"step":1},{"id":"wenv1end","def":3,"min":1,"max":8,"step":1},{"id":"senv1t1","def":0.02,"min":0,"max":10,"curve":3},{"id":"senv1l1","def":0.8,"min":0,"max":1},{"id":"senv1t2","def":0.8,"min":0,"max":10,"curve":3},{"id":"senv1l2","def":0.4,"min":0,"max":1},{"id":"senv1t3","def":0.4,"min":0,"max":10,"curve":3},{"id":"senv1l3","def":0,"min":0,"max":1},{"id":"senv1t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv1l4","def":0,"min":0,"max":1},{"id":"senv1t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv1l5","def":0,"min":0,"max":1},{"id":"senv1t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv1l6","def":0,"min":0,"max":1},{"id":"senv1t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv1l7","def":0,"min":0,"max":1},{"id":"senv1t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv1l8","def":0,"min":0,"max":1},{"id":"senv1sus","def":2,"min":0,"max":8,"step":1},{"id":"senv1end","def":3,"min":1,"max":8,"step":1},{"id":"aenv1t1","def":0.005,"min":0,"max":10,"curve":3},{"id":"aenv1l1","def":1,"min":0,"max":1},{"id":"aenv1t2","def":0.5,"min":0,"max":10,"curve":3},{"id":"aenv1l2","def":0.7,"min":0,"max":1},{"id":"aenv1t3","def":0.3,"min":0,"max":10,"curve":3},{"id":"aenv1l3","def":0,"min":0,"max":1},{"id":"aenv1t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv1l4","def":0,"min":0,"max":1},{"id":"aenv1t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv1l5","def":0,"min":0,"max":1},{"id":"aenv1t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv1l6","def":0,"min":0,"max":1},{"id":"aenv1t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv1l7","def":0,"min":0,"max":1},{"id":"aenv1t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv1l8","def":0,"min":0,"max":1},{"id":"aenv1sus","def":2,"min":0,"max":8,"step":1},{"id":"aenv1end","def":3,"min":1,"max":8,"step":1},{"id":"penv1t1","def":0.05,"min":0,"max":10,"curve":3},{"id":"penv1l1","def":0,"min":0,"max":1},{"id":"penv1t2","def":0.3,"min":0,"max":10,"curve":3},{"id":"penv1l2","def":0,"min":0,"max":1},{"id":"penv1t3","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l3","def":0,"min":0,"max":1},{"id":"penv1t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l4","def":0,"min":0,"max":1},{"id":"penv1t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l5","def":0,"min":0,"max":1},{"id":"penv1t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l6","def":0,"min":0,"max":1},{"id":"penv1t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l7","def":0,"min":0,"max":1},{"id":"penv1t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv1l8","def":0,"min":0,"max":1},{"id":"penv1sus","def":0,"min":0,"max":8,"step":1},{"id":"penv1end","def":2,"min":1,"max":8,"step":1},{"id":"level2","def":0,"min":-48,"max":6},{"id":"octave2","def":0,"min":-3,"max":3,"step":1},{"id":"fifth2","def":0,"min":0,"max":1,"step":1},{"id":"detune2","def":7,"min":-100,"max":100},{"id":"penvdepth2","def":0,"min":-24,"max":24},{"id":"wfamily2","def":0,"min":0,"max":3,"step":1},{"id":"wave2","def":0,"min":0,"max":6,"step":1},{"id":"pair2","def":0,"min":0,"max":7,"step":1},{"id":"window2","def":0,"min":0,"max":5,"step":1},{"id":"vecx2","def":0.5,"min":0,"max":1},{"id":"vecy2","def":1.5,"min":0,"max":4},{"id":"curve2","def":1,"min":0,"max":2,"step":1},{"id":"ratio2","def":2,"min":1,"max":16},{"id":"warp2","def":0,"min":0,"max":1},{"id":"warpkey2","def":0.3,"min":0,"max":1},{"id":"wenvdepth2","def":1,"min":-1,"max":1},{"id":"velwarp2","def":0.3,"min":0,"max":1},{"id":"velamp2","def":0.7,"min":0,"max":1},{"id":"sfamily2","def":0,"min":0,"max":3,"step":1},{"id":"shape2","def":0,"min":0,"max":1},{"id":"bias2","def":0,"min":-1,"max":1},{"id":"h1_2","def":1,"min":0,"max":1},{"id":"h2_2","def":0,"min":0,"max":1},{"id":"h3_2","def":0,"min":0,"max":1},{"id":"h4_2","def":0,"min":0,"max":1},{"id":"h5_2","def":0,"min":0,"max":1},{"id":"h6_2","def":0,"min":0,"max":1},{"id":"h7_2","def":0,"min":0,"max":1},{"id":"h8_2","def":0,"min":0,"max":1},{"id":"h9_2","def":0,"min":0,"max":1},{"id":"h10_2","def":0,"min":0,"max":1},{"id":"h11_2","def":0,"min":0,"max":1},{"id":"h12_2","def":0,"min":0,"max":1},{"id":"h13_2","def":0,"min":0,"max":1},{"id":"h14_2","def":0,"min":0,"max":1},{"id":"h15_2","def":0,"min":0,"max":1},{"id":"h16_2","def":0,"min":0,"max":1},{"id":"tilt2","def":0,"min":-1,"max":1},{"id":"oddeven2","def":0,"min":-1,"max":1},{"id":"fold2","def":1,"min":0,"max":2,"step":1},{"id":"sat2","def":0,"min":0,"max":2,"step":1},{"id":"keys2","def":4,"min":2,"max":4,"step":1},{"id":"morph2","def":0,"min":0,"max":1},{"id":"order2","def":0,"min":0,"max":2,"step":1},{"id":"ordermorph2","def":0,"min":0,"max":1},{"id":"swmode2","def":0,"min":0,"max":1,"step":1},{"id":"morphway2","def":0,"min":0,"max":1,"step":1},{"id":"twist2","def":0,"min":0,"max":1},{"id":"shapekey2","def":0.3,"min":0,"max":1},{"id":"senvdepth2","def":0,"min":-1,"max":1},{"id":"link2","def":0,"min":-1,"max":1},{"id":"velshape2","def":0.3,"min":0,"max":1},{"id":"wenv2t1","def":0.02,"min":0,"max":10,"curve":3},{"id":"wenv2l1","def":0.8,"min":0,"max":1},{"id":"wenv2t2","def":0.8,"min":0,"max":10,"curve":3},{"id":"wenv2l2","def":0.4,"min":0,"max":1},{"id":"wenv2t3","def":0.4,"min":0,"max":10,"curve":3},{"id":"wenv2l3","def":0,"min":0,"max":1},{"id":"wenv2t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv2l4","def":0,"min":0,"max":1},{"id":"wenv2t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv2l5","def":0,"min":0,"max":1},{"id":"wenv2t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv2l6","def":0,"min":0,"max":1},{"id":"wenv2t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv2l7","def":0,"min":0,"max":1},{"id":"wenv2t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"wenv2l8","def":0,"min":0,"max":1},{"id":"wenv2sus","def":2,"min":0,"max":8,"step":1},{"id":"wenv2end","def":3,"min":1,"max":8,"step":1},{"id":"senv2t1","def":0.02,"min":0,"max":10,"curve":3},{"id":"senv2l1","def":0.8,"min":0,"max":1},{"id":"senv2t2","def":0.8,"min":0,"max":10,"curve":3},{"id":"senv2l2","def":0.4,"min":0,"max":1},{"id":"senv2t3","def":0.4,"min":0,"max":10,"curve":3},{"id":"senv2l3","def":0,"min":0,"max":1},{"id":"senv2t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv2l4","def":0,"min":0,"max":1},{"id":"senv2t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv2l5","def":0,"min":0,"max":1},{"id":"senv2t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv2l6","def":0,"min":0,"max":1},{"id":"senv2t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv2l7","def":0,"min":0,"max":1},{"id":"senv2t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"senv2l8","def":0,"min":0,"max":1},{"id":"senv2sus","def":2,"min":0,"max":8,"step":1},{"id":"senv2end","def":3,"min":1,"max":8,"step":1},{"id":"aenv2t1","def":0.005,"min":0,"max":10,"curve":3},{"id":"aenv2l1","def":1,"min":0,"max":1},{"id":"aenv2t2","def":0.5,"min":0,"max":10,"curve":3},{"id":"aenv2l2","def":0.7,"min":0,"max":1},{"id":"aenv2t3","def":0.3,"min":0,"max":10,"curve":3},{"id":"aenv2l3","def":0,"min":0,"max":1},{"id":"aenv2t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv2l4","def":0,"min":0,"max":1},{"id":"aenv2t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv2l5","def":0,"min":0,"max":1},{"id":"aenv2t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv2l6","def":0,"min":0,"max":1},{"id":"aenv2t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv2l7","def":0,"min":0,"max":1},{"id":"aenv2t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"aenv2l8","def":0,"min":0,"max":1},{"id":"aenv2sus","def":2,"min":0,"max":8,"step":1},{"id":"aenv2end","def":3,"min":1,"max":8,"step":1},{"id":"penv2t1","def":0.05,"min":0,"max":10,"curve":3},{"id":"penv2l1","def":0,"min":0,"max":1},{"id":"penv2t2","def":0.3,"min":0,"max":10,"curve":3},{"id":"penv2l2","def":0,"min":0,"max":1},{"id":"penv2t3","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l3","def":0,"min":0,"max":1},{"id":"penv2t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l4","def":0,"min":0,"max":1},{"id":"penv2t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l5","def":0,"min":0,"max":1},{"id":"penv2t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l6","def":0,"min":0,"max":1},{"id":"penv2t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l7","def":0,"min":0,"max":1},{"id":"penv2t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"penv2l8","def":0,"min":0,"max":1},{"id":"penv2sus","def":0,"min":0,"max":8,"step":1},{"id":"penv2end","def":2,"min":1,"max":8,"step":1},{"id":"lfo1shape","def":0,"min":0,"max":4,"step":1},{"id":"lfo1rate","def":2,"min":0.01,"max":50,"log":true},{"id":"lfo1sync","def":0,"min":0,"max":1,"step":1},{"id":"lfo1div","def":5,"min":0,"max":9,"step":1},{"id":"lfo1retrig","def":1,"min":0,"max":1,"step":1},{"id":"lfo1dest1","def":0,"min":0,"max":42,"step":1},{"id":"lfo1depth1","def":0,"min":-1,"max":1},{"id":"lfo1dest2","def":0,"min":0,"max":42,"step":1},{"id":"lfo1depth2","def":0,"min":-1,"max":1},{"id":"lfo2shape","def":0,"min":0,"max":4,"step":1},{"id":"lfo2rate","def":2,"min":0.01,"max":50,"log":true},{"id":"lfo2sync","def":0,"min":0,"max":1,"step":1},{"id":"lfo2div","def":5,"min":0,"max":9,"step":1},{"id":"lfo2retrig","def":1,"min":0,"max":1,"step":1},{"id":"lfo2dest1","def":0,"min":0,"max":42,"step":1},{"id":"lfo2depth1","def":0,"min":-1,"max":1},{"id":"lfo2dest2","def":0,"min":0,"max":42,"step":1},{"id":"lfo2depth2","def":0,"min":-1,"max":1},{"id":"menv1t1","def":0.05,"min":0,"max":10,"curve":3},{"id":"menv1l1","def":1,"min":0,"max":1},{"id":"menv1t2","def":0.5,"min":0,"max":10,"curve":3},{"id":"menv1l2","def":0.6,"min":0,"max":1},{"id":"menv1t3","def":0.3,"min":0,"max":10,"curve":3},{"id":"menv1l3","def":0,"min":0,"max":1},{"id":"menv1t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv1l4","def":0,"min":0,"max":1},{"id":"menv1t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv1l5","def":0,"min":0,"max":1},{"id":"menv1t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv1l6","def":0,"min":0,"max":1},{"id":"menv1t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv1l7","def":0,"min":0,"max":1},{"id":"menv1t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv1l8","def":0,"min":0,"max":1},{"id":"menv1sus","def":2,"min":0,"max":8,"step":1},{"id":"menv1end","def":3,"min":1,"max":8,"step":1},{"id":"menv1dest1","def":0,"min":0,"max":42,"step":1},{"id":"menv1depth1","def":0,"min":-1,"max":1},{"id":"menv1dest2","def":0,"min":0,"max":42,"step":1},{"id":"menv1depth2","def":0,"min":-1,"max":1},{"id":"menv2t1","def":0.05,"min":0,"max":10,"curve":3},{"id":"menv2l1","def":1,"min":0,"max":1},{"id":"menv2t2","def":0.5,"min":0,"max":10,"curve":3},{"id":"menv2l2","def":0.6,"min":0,"max":1},{"id":"menv2t3","def":0.3,"min":0,"max":10,"curve":3},{"id":"menv2l3","def":0,"min":0,"max":1},{"id":"menv2t4","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv2l4","def":0,"min":0,"max":1},{"id":"menv2t5","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv2l5","def":0,"min":0,"max":1},{"id":"menv2t6","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv2l6","def":0,"min":0,"max":1},{"id":"menv2t7","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv2l7","def":0,"min":0,"max":1},{"id":"menv2t8","def":0.1,"min":0,"max":10,"curve":3},{"id":"menv2l8","def":0,"min":0,"max":1},{"id":"menv2sus","def":2,"min":0,"max":8,"step":1},{"id":"menv2end","def":3,"min":1,"max":8,"step":1},{"id":"menv2dest1","def":0,"min":0,"max":42,"step":1},{"id":"menv2depth1","def":0,"min":-1,"max":1},{"id":"menv2dest2","def":0,"min":0,"max":42,"step":1},{"id":"menv2depth2","def":0,"min":-1,"max":1},{"id":"wheeldest","def":0,"min":0,"max":42,"step":1},{"id":"wheeldepth","def":0,"min":-1,"max":1},{"id":"atdest","def":0,"min":0,"max":42,"step":1},{"id":"atdepth","def":0,"min":-1,"max":1},{"id":"transpose","def":0,"min":-24,"max":24,"step":1},{"id":"bendrange","def":2,"min":2,"max":24,"step":1},{"id":"volume","def":-6,"min":-48,"max":6}],"DEST_IDS":["pitch","level","detune","warp","vecx","vecy","ratio","shape","bias","tilt","oddeven","morph","ordermorph","twist"],"LINE_SELECT":["1","2","1+1′","1+2"],"LFO_SHAPES":["Sine","Triangle","Saw","Square","Random"],"SYNC_BEATS":[0.125,0.25,0.3333333333333333,0.5,0.6666666666666666,1,2,4,8,16],"WAVES":["Saw","Square","Pulse","Double sine","Saw-pulse","Resonance","Double pulse"],"WINDOWS":["None","Saw","Triangle","Trapezoid","Pulse","Double saw"],"FAMILIES":["CZ","Vector","Smooth","Sync"],"SHAPERS":["Chebyshev","Fold","Saturate","Drawn"],"FOLDS":["Triangle","Sine","Analog"],"SATS":["Tanh","Arctan","Cubic"],"ORDERS":["Warp→Shape","Shape→Warp","Morph"],"NH":16,"CURVES":[[-1,-0.9952,-0.9808,-0.9569,-0.9239,-0.8819,-0.8315,-0.773,-0.7071,-0.6344,-0.5556,-0.4714,-0.3827,-0.2903,-0.1951,-0.098,0,0.098,0.1951,0.2903,0.3827,0.4714,0.5556,0.6344,0.7071,0.773,0.8315,0.8819,0.9239,0.9569,0.9808,0.9952,1],[-1,-0.9938,-0.9546,-0.8688,-0.75,-0.6312,-0.5454,-0.5062,-0.5,-0.4938,-0.4546,-0.3688,-0.25,-0.1312,-0.0454,-0.0062,0,0.0062,0.0454,0.1312,0.25,0.3688,0.4546,0.4938,0.5,0.5062,0.5454,0.6312,0.75,0.8688,0.9546,0.9938,1],[1,0.9569,0.8315,0.6344,0.3827,0.098,-0.1951,-0.4714,-0.7071,-0.8819,-0.9808,-0.9952,-0.9239,-0.773,-0.5556,-0.2903,0,0.2903,0.5556,0.773,0.9239,0.9952,0.9808,0.8819,0.7071,0.4714,0.1951,-0.098,-0.3827,-0.6344,-0.8315,-0.9569,-1],[1,0.875,0.75,0.625,0.5,0.375,0.25,0.125,0,-0.125,-0.25,-0.375,-0.5,-0.625,-0.75,-0.875,-1,-0.875,-0.75,-0.625,-0.5,-0.375,-0.25,-0.125,0,0.125,0.25,0.375,0.5,0.625,0.75,0.875,1]]};
+</script>
+<script>
+// Test presets: for the bench and the tests only, not the plugin build.
+// Each has the settings and a short phrase: [note (MIDI), start (s), length (s), velocity?].
+// steps: parameter changes at given times. design: the design.md §11 preset it is, if any.
+(function (root) {
+  'use strict';
+
+  // an 8-stage envelope as params: env('wenv', 1, [[time, level], ...], sustain, end)
+  function env(name, line, stages, sus, end) {
+    const o = {};
+    stages.forEach(([t, l], i) => { o[name + line + 't' + (i + 1)] = t; o[name + line + 'l' + (i + 1)] = l; });
+    o[name + line + 'sus'] = sus; o[name + line + 'end'] = end;
+    return o;
+  }
+  const chord = (notes, t, d, vel) => notes.map(n => [n, t, d, vel || 100]);
+  // one note per wave or window, each sweeping Warp 0 → 1 → 0
+  const sweepEnv = env('wenv', 1, [[0.6, 1], [0.6, 0]], 0, 2);
+
+  const PRESETS = [
+    {
+      name: 'CZ Brass',
+      design: true,
+      about: 'Saw, the Warp envelope opens on each attack and settles. Shape 0: the CZ core alone. Four-note chords, so Volume is 6 dB down to match the single-note presets.',
+      params: {
+        wave1: 0, warp1: 0, velwarp1: 0.4, volume: -12,
+        ...env('wenv', 1, [[0.07, 0.8], [0.5, 0.5], [0.25, 0]], 2, 3),
+        ...env('aenv', 1, [[0.03, 1], [0.6, 0.85], [0.25, 0]], 2, 3),
+      },
+      phrase: [
+        ...chord([48, 55, 60, 64], 0, 0.9, 110), ...chord([50, 57, 62, 65], 1.0, 0.9, 95),
+        ...chord([52, 55, 60, 67], 2.0, 0.45, 120), ...chord([53, 57, 60, 69], 2.5, 1.4, 110),
+      ],
+    },
+    {
+      name: 'CZ Reso Sweep',
+      design: true,
+      about: 'Resonance with the Triangle window (the CZ\'s Reso 2). A slow Warp envelope sweeps the formant up and back down.',
+      params: {
+        wave1: 5, window1: 2, warp1: 0, warpkey1: 0,
+        ...env('wenv', 1, [[2.0, 1], [2.0, 0.05]], 0, 2),
+        ...env('aenv', 1, [[0.01, 1], [3.8, 0.8], [0.4, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 4.0], [43, 0, 4.0]],
+    },
+    {
+      name: 'Wave tour',
+      about: 'Each wave in turn: Saw, Square, Pulse, Double sine, Saw-pulse, Resonance (no window), Double pulse. Warp sweeps 0 → 1 → 0 on each.',
+      params: { warp1: 0, warpkey1: 0, velwarp1: 0, ...sweepEnv, ...env('aenv', 1, [[0.01, 1], [1.2, 1], [0.05, 0]], 2, 3) },
+      phrase: [0, 1, 2, 3, 4, 5, 6].map(i => [48, i * 1.3, 1.2]),
+      steps: [0, 1, 2, 3, 4, 5, 6].map(i => ({ time: i * 1.3 - 0.01, params: { wave1: i } })),
+    },
+    {
+      name: 'Window tour',
+      about: 'Resonance through each window: None, Saw, Triangle, Trapezoid, and the hidden Pulse and Double saw. Warp sweeps 0 → 1 → 0 on each.',
+      params: { wave1: 5, warp1: 0, warpkey1: 0, velwarp1: 0, ...sweepEnv, ...env('aenv', 1, [[0.01, 1], [1.2, 1], [0.05, 0]], 2, 3) },
+      phrase: [0, 1, 2, 3, 4, 5].map(i => [45, i * 1.3, 1.2]),
+      steps: [0, 1, 2, 3, 4, 5].map(i => ({ time: i * 1.3 - 0.01, params: { window1: i } })),
+    },
+    {
+      name: 'Windowed saw',
+      about: 'A window on a wave the CZ never windows: Saw, then Square, through the Triangle window. The chip allows it; Pretzel keeps it.',
+      params: { wave1: 0, window1: 2, warp1: 0.2, warpkey1: 0, ...env('wenv', 1, [[0.4, 0.9], [1.2, 0.3]], 0, 2), ...env('aenv', 1, [[0.02, 1], [1.4, 0.9], [0.2, 0]], 2, 3) },
+      phrase: [[40, 0, 1.6], [40, 1.8, 1.6]],
+      steps: [{ time: 1.79, params: { wave1: 1 } }],
+    },
+    {
+      name: 'Wave pair',
+      about: 'Saw alone, then Saw paired with Pulse: alternating waves each cycle halve the pitch and add a sub-octave buzz.',
+      params: { wave1: 0, pair1: 0, warp1: 0.55, wenvdepth1: 0.3, warpkey1: 0, ...env('wenv', 1, [[0.5, 1], [1.0, 0]], 0, 2), ...env('aenv', 1, [[0.02, 1], [1.4, 0.9], [0.2, 0]], 2, 3) },
+      phrase: [[57, 0, 1.6], [57, 1.8, 1.6]],
+      steps: [{ time: 1.79, params: { pair1: 3 } }],
+    },
+    {
+      name: 'Square lead (mono)',
+      about: 'Square in Mono with glide: legato notes slide and keep their envelopes running.',
+      params: {
+        mode: 0, glide: 0.06, wave1: 1, warp1: 0.35, wenvdepth1: 0.5, transpose: 12,
+        ...env('wenv', 1, [[0.15, 1], [0.6, 0.4]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [0.3, 0.85], [0.3, 0]], 2, 3),
+      },
+      phrase: [[60, 0, 0.5], [63, 0.4, 0.5], [67, 0.8, 0.3], [70, 1.05, 0.6], [68, 1.6, 0.25], [67, 1.8, 1.0]],
+    },
+
+    // ---------- batch 03: the shaper ----------
+    {
+      name: 'Organ Pretzel',
+      design: true,
+      about: 'Warp 0 (a pure cosine) into Chebyshev at Shape 1: a drawbar set of exact harmonics 1, 2, 3, 4, 6, 8 and 12. The shaper alone.',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 0, shape1: 1, shapekey1: 0, velshape1: 0, velamp1: 0.3, volume: -12,
+        h1_1: 1, h2_1: 0.7, h3_1: 0.5, h4_1: 0.35, h6_1: 0.25, h8_1: 0.3, h12_1: 0.15,
+        ...env('aenv', 1, [[0.004, 1], [0.1, 1], [0.08, 0]], 2, 3),
+      },
+      phrase: [...chord([48, 55, 64, 67], 0, 1.2), ...chord([50, 57, 65, 69], 1.3, 1.2), ...chord([43, 55, 62, 71], 2.6, 1.6)],
+    },
+    {
+      name: 'Linked',
+      design: true,
+      about: 'Saw into Chebyshev (odd harmonics), Link 1: the Warp envelope opens both axes at once, so each attack bends time and level together.',
+      params: {
+        wave1: 0, warp1: 0, sfamily1: 0, shape1: 0, senvdepth1: 0, link1: 1, warpkey1: 0.2, shapekey1: 0.2,
+        h1_1: 1, h3_1: 0.6, h5_1: 0.4, h7_1: 0.3, h9_1: 0.2,
+        ...env('wenv', 1, [[0.12, 1], [0.9, 0.25], [0.3, 0]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [0.8, 0.8], [0.3, 0]], 2, 3),
+      },
+      phrase: [[40, 0, 0.8], [43, 0.9, 0.4], [45, 1.4, 0.4], [47, 1.9, 1.2], [52, 3.2, 1.0]],
+    },
+    {
+      name: 'Folded Saw',
+      design: true,
+      about: 'A gently warped Saw into the Sine folder; the Shape envelope sweeps the fold gain up to 10 and back. Not band-limited yet (batch 04): high folds alias.',
+      params: {
+        wave1: 0, warp1: 0.25, wenvdepth1: 0, sfamily1: 1, fold1: 1, shape1: 0, senvdepth1: 1, shapekey1: 0,
+        ...env('senv', 1, [[1.6, 1], [1.6, 0.15]], 0, 2),
+        ...env('aenv', 1, [[0.02, 1], [3.0, 0.9], [0.4, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 3.3], [43, 0, 3.3]],
+    },
+    {
+      name: 'Shaper tour',
+      about: 'A pure cosine (Warp 0) through each shaper, Shape sweeping 0 → 1 → 0: Chebyshev (harmonics 1/k), Fold Triangle, Sine, Analog, Saturate Tanh, Arctan, Cubic, Drawn (terraces).',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, shape1: 0, senvdepth1: 1, shapekey1: 0, velshape1: 0, morph1: 1 / 3,
+        ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1 / (i + 1)])),
+        ...env('senv', 1, [[0.6, 1], [0.6, 0]], 0, 2),
+        ...env('aenv', 1, [[0.01, 1], [1.2, 1], [0.05, 0]], 2, 3),
+      },
+      phrase: [0, 1, 2, 3, 4, 5, 6, 7].map(i => [48, i * 1.3, 1.2]),
+      steps: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 2, 0], [2, 0, 0], [2, 0, 1], [2, 0, 2], [3, 0, 0]]
+        .map(([f, fo, sa], i) => ({ time: i * 1.3 - 0.01, params: { sfamily1: f, fold1: fo, sat1: sa } })),
+    },
+    {
+      name: 'Drawn morph',
+      about: 'A lightly warped Saw through the drawn keyframes at Shape 1, Morph moving slowly through all four: soft S, terraces, sine fold, full-wave rectifier (an octave up).',
+      params: {
+        wave1: 0, warp1: 0.15, wenvdepth1: 0, sfamily1: 3, shape1: 1, shapekey1: 0, velshape1: 0, morph1: 0,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[45, 0, 6.2], [52, 0, 6.2]],
+      sweeps: [{ id: 'morph1', from: 0, to: 1, start: 0.3, end: 5.9 }],
+    },
+    {
+      name: 'Bias',
+      about: 'A pure cosine into Tanh at Shape 0.6. Bias 0 gives odd harmonics only; Bias moves to +0.8 and then −0.8, bringing in even harmonics.',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 2, sat1: 0, shape1: 0.6, shapekey1: 0, velshape1: 0, bias1: 0,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[48, 0, 6.2]],
+      sweeps: [{ id: 'bias1', from: 0, to: 0.8, start: 1, end: 3 }, { id: 'bias1', from: 0.8, to: -0.8, start: 3.5, end: 5.5 }],
+    },
+    {
+      name: 'Tilt and Odd-Even',
+      about: 'All 16 Chebyshev harmonics at full, Shape 1. Tilt sweeps from dark (−1) to bright (+1) and back to 0; then Odd/Even sweeps from odd-only cut (−1, hollow octaves) to even cut (+1, a square-like tone).',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 0, shape1: 1, shapekey1: 0, velshape1: 0, tilt1: -1, oddeven1: 0,
+        ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1])),
+        ...env('aenv', 1, [[0.05, 1], [7, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[43, 0, 7.0]],
+      sweeps: [{ id: 'tilt1', from: -1, to: 1, start: 0.3, end: 3.0 }, { id: 'tilt1', from: 1, to: 0, start: 3.0, end: 3.5 },
+        { id: 'oddeven1', from: -1, to: 1, start: 3.6, end: 6.8 }],
+    },
+
+    // ---------- batch 04: band limiting ----------
+    {
+      name: 'Up high',
+      about: 'A run up to MIDI 103, twice: a warped Saw into the Sine folder, then hard-synced Resonance (no window). Where aliasing used to be loudest; key follow off so nothing hides it.',
+      params: {
+        wave1: 0, warp1: 0.7, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0, velwarp1: 0,
+        mode: 0, glide: 0,
+        ...env('aenv', 1, [[0.005, 1], [0.2, 0.9], [0.05, 0]], 2, 3),
+      },
+      phrase: [...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, i * 0.3, 0.28]), ...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, 2.6 + i * 0.3, 0.28])],
+      steps: [{ time: 2.55, params: { wave1: 5, warp1: 0.85, sfamily1: 0, shape1: 0 } }],
+    },
+
+    // ---------- batch 06: out-of-bounds warps ----------
+    {
+      name: 'Vowel',
+      design: true,
+      about: 'Vector at Warp 1 with v = 2.5: the first part of each cycle reads 2.5 cycles, a formant. The mod wheel moves d from 0.1 to 0.9 and back, moving the formant like a vowel.',
+      params: {
+        wfamily1: 1, vecx1: 0.1, vecy1: 2.5, warp1: 1, wenvdepth1: 0, warpkey1: 0, velwarp1: 0, volume: -12,
+        wheeldest: 14, wheeldepth: 0.8,
+        ...env('aenv', 1, [[0.15, 1], [6, 0.9], [0.6, 0]], 2, 3),
+      },
+      phrase: [...chord([45, 52, 57, 60], 0, 6.2, 90)],
+      sweeps: [{ id: 'wheel', from: 0, to: 1, start: 0.2, end: 3.2 }, { id: 'wheel', from: 1, to: 0, start: 3.2, end: 6.0 }],
+    },
+    {
+      name: 'Vector bass',
+      about: 'Vector at (0.15, 3.5) into a little Tanh: the Warp envelope plucks each note from a pure cosine to a hard formant and back.',
+      params: {
+        wfamily1: 1, vecx1: 0.15, vecy1: 3.5, warp1: 0, wenvdepth1: 1, warpkey1: 0, velwarp1: 0.4,
+        sfamily1: 2, sat1: 0, shape1: 0.35, shapekey1: 0,
+        ...env('wenv', 1, [[0.005, 1], [0.35, 0.15]], 2, 3),
+        ...env('aenv', 1, [[0.003, 1], [0.6, 0.6], [0.08, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 0.3], [33, 0.4, 0.15], [45, 0.6, 0.2], [36, 0.9, 0.35], [38, 1.3, 0.3], [40, 1.7, 0.7]],
+    },
+    {
+      name: 'Smooth tour',
+      about: 'The three Smooth curves, each with Warp sweeping 0 → 1 → 0: Power (the cosine pushed to the end of the cycle), Sigmoid (squeezed into the middle), Bezier (handles at (0.1, 0.9): a rounded square). No corners anywhere.',
+      params: {
+        wfamily1: 2, curve1: 0, vecx1: 0.1, vecy1: 3.6, warp1: 0, warpkey1: 0, velwarp1: 0,
+        ...env('wenv', 1, [[0.9, 1], [0.9, 0]], 0, 2), ...env('aenv', 1, [[0.01, 1], [1.8, 1], [0.05, 0]], 2, 3),
+      },
+      phrase: [0, 1, 2].map((i) => [45, i * 1.9, 1.8]),
+      steps: [0, 1, 2].map((i) => ({ time: i * 1.9 - 0.01, params: { curve1: i } })),
+    },
+    {
+      name: 'Sync sweep',
+      about: 'Sync to ratio 12: the Warp envelope sweeps the synced cosine up on each note. Plain first (the hard-sync edge), then through the Triangle window (a smooth, vocal sweep).',
+      params: {
+        wfamily1: 3, ratio1: 12, warp1: 0, wenvdepth1: 1, warpkey1: 0, velwarp1: 0, window1: 0,
+        ...env('wenv', 1, [[1.2, 1], [0.6, 0.6]], 2, 3), ...env('aenv', 1, [[0.01, 1], [1.5, 0.9], [0.2, 0]], 2, 3),
+      },
+      phrase: [[40, 0, 1.6], [47, 1.8, 1.6], [40, 3.6, 1.6], [47, 5.4, 1.6]],
+      steps: [{ time: 3.55, params: { window1: 2 } }],
+    },
+
+    // ---------- batch 07: order (A/B and the two Morph ways are temporary switches) ----------
+    ...[[0, 'A', 'the shaped wave read back as a phase'], [1, 'B', 'the shaper bending the phase ramp']].map(([def, n, how]) => ({
+      name: 'Inside Out (' + n + ')',
+      design: true,
+      about: 'Shape → Warp, definition ' + n + ' (' + how + '): a warped Saw with the Sine fold on its phase. The Shape envelope opens on each note. Compare with the other letter.',
+      params: {
+        wave1: 0, warp1: 0.6, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.1, senvdepth1: 0.8, shapekey1: 0, velshape1: 0,
+        order1: 1, swmode1: def,
+        ...env('senv', 1, [[0.6, 1], [1.2, 0.3]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [1.5, 0.85], [0.3, 0]], 2, 3),
+      },
+      phrase: [[45, 0, 1.6], [52, 1.8, 1.6], [40, 3.6, 2.2]],
+    })),
+    ...[[0, 'through the warp', 'the fold leaves the output, the warp plays alone at the middle, then the fold enters the phase'], [1, 'shared', 'Shape is shared between the output and the phase all the way']].map(([way, n, how]) => ({
+      name: 'Turning (' + n + ')',
+      design: true,
+      about: 'A warped Saw with the Sine fold, a slow triangle LFO moving Morph 0 → 1 → 0 (' + how + '). Shape → Warp: Bend.',
+      params: {
+        wave1: 0, warp1: 0.65, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0,
+        order1: 2, ordermorph1: 0.5, morphway1: way, swmode1: 1, volume: -9,
+        lfo1shape: 1, lfo1rate: 1 / 5.6, lfo1dest1: 38, lfo1depth1: 0.5,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[43, 0, 6.2], [50, 0, 6.2]],
+    })),
+
+    // ---------- batch 08: Twist ----------
+    {
+      name: 'Knot',
+      design: true,
+      about: 'A warped Saw into the Sine fold with Twist 0.6: the shaped wave pulls its own phase. Twist has no envelope yet (mod envelopes and LFOs come in batch 09).',
+      params: {
+        wave1: 0, warp1: 0.5, wenvdepth1: 0.3, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.45, shapekey1: 0, velshape1: 0, twist1: 0.6,
+        ...env('wenv', 1, [[0.3, 1], [1.0, 0.4]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [1.2, 0.85], [0.3, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 1.4], [43, 1.5, 0.6], [41, 2.2, 0.6], [36, 2.9, 1.6]],
+    },
+    {
+      name: 'Twist sweep',
+      about: 'A pure cosine with Twist rising from 0 to 1 over five seconds: the DX feedback trick, a sine turning into a saw by about ½, then breaking up in the last quarter.',
+      params: { wave1: 0, warp1: 0, wenvdepth1: 0, twist1: 0, ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3) },
+      phrase: [[45, 0, 6.0]],
+      sweeps: [{ id: 'twist1', from: 0, to: 1, start: 0.3, end: 5.3 }],
+    },
+    {
+      name: 'Twisted resonance',
+      about: 'Resonance through the Triangle window, a slow Warp swell, Twist 0.5: the formant gets a rough, vocal edge. Then the same with Twist 0, for comparison.',
+      params: {
+        wave1: 5, window1: 2, warp1: 0.2, wenvdepth1: 0.7, warpkey1: 0, twist1: 0.5,
+        ...env('wenv', 1, [[1.2, 1], [0.8, 0.5]], 2, 3), ...env('aenv', 1, [[0.05, 1], [2, 0.9], [0.3, 0]], 2, 3),
+      },
+      phrase: [[38, 0, 2.4], [38, 2.8, 2.4]],
+      steps: [{ time: 2.75, params: { twist1: 0 } }],
+    },
+    {
+      name: 'Knot to chaos',
+      about: 'Square into the Analog fold, Shape → Warp (Bend), Twist swept from 0.4 to 1: steady up to ¾, then breaking into controlled chaos.',
+      params: {
+        wave1: 1, warp1: 0.4, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 2, shape1: 0.5, shapekey1: 0, order1: 1, swmode1: 1, twist1: 0.4,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 5.5]],
+      sweeps: [{ id: 'twist1', from: 0.4, to: 1, start: 0.5, end: 5.0 }],
+    },
+
+    // ---------- batch 09: two lines and modulation ----------
+    {
+      name: 'CZ Duo',
+      batch: 9,
+      about: 'Lines 1+2: a Saw with a brassy Warp envelope, and Resonance through the Triangle window an octave up, 7 cents sharp, with a slower envelope of its own.',
+      params: {
+        lines: 3, volume: -12,
+        wave1: 0, warp1: 0, velwarp1: 0.4, ...env('wenv', 1, [[0.07, 0.8], [0.5, 0.5], [0.25, 0]], 2, 3), ...env('aenv', 1, [[0.03, 1], [0.6, 0.85], [0.25, 0]], 2, 3),
+        wave2: 5, window2: 2, octave2: 1, detune2: 7, warp2: 0, warpkey2: 0.2, ...env('wenv', 2, [[0.6, 0.9], [0.8, 0.4], [0.4, 0]], 2, 3), ...env('aenv', 2, [[0.15, 1], [0.8, 0.7], [0.4, 0]], 2, 3), level2: -4,
+      },
+      phrase: [...chord([48, 55, 60, 64], 0, 0.9, 110), ...chord([50, 57, 62, 65], 1.0, 0.9, 95), ...chord([53, 57, 60, 69], 2.0, 1.6, 110)],
+    },
+    {
+      name: '1+1′ chorus',
+      batch: 9,
+      about: 'Lines 1+1′: line 1 played twice, the copy 9 cents sharp, a Square into a little Tanh. The CZ\'s own chorus.',
+      params: {
+        lines: 2, detune2: 9, volume: -12,
+        wave1: 1, warp1: 0.35, wenvdepth1: 0.4, sfamily1: 2, shape1: 0.4, ...env('wenv', 1, [[0.2, 1], [1.0, 0.3]], 2, 3), ...env('aenv', 1, [[0.08, 1], [1.2, 0.9], [0.5, 0]], 2, 3),
+      },
+      phrase: [...chord([45, 52, 57, 64], 0, 1.4, 90), ...chord([43, 50, 55, 62], 1.6, 1.8, 90)],
+    },
+    {
+      name: 'Ring bell',
+      batch: 9,
+      about: 'Ring: line 2 (a cosine an octave and a fifth up, 8 cents flat) times line 1 (a cosine), with short, decaying envelopes: inharmonic, bell-like partials.',
+      params: {
+        lines: 3, ring: 1, volume: -6,
+        warp1: 0, wenvdepth1: 0, ...env('aenv', 1, [[0.002, 1], [2.5, 0]], 0, 2), velamp1: 0.3,
+        warp2: 0.3, wenvdepth2: 0, octave2: 1, fifth2: 1, detune2: -8, ...env('aenv', 2, [[0.002, 1], [1.2, 0]], 0, 2), velamp2: 0.3,
+      },
+      phrase: [[72, 0, 2.0], [79, 0.5, 2.0], [76, 1.0, 2.0], [84, 1.5, 2.5]],
+    },
+    {
+      name: 'Noise hit',
+      batch: 9,
+      about: 'A drum from the CZ trick: line 1 a cosine whose pitch envelope drops two octaves in 60 ms (the body), line 2 with Noise on its pitch and a short envelope (the snare).',
+      params: {
+        lines: 3, noise: 1, volume: -6,
+        warp1: 0, wenvdepth1: 0, penvdepth1: 24, ...env('penv', 1, [[0.001, 1], [0.06, 0]], 0, 2), ...env('aenv', 1, [[0.001, 1], [0.25, 0]], 0, 2),
+        wave2: 0, warp2: 0.8, wenvdepth2: 0, ...env('aenv', 2, [[0.001, 1], [0.12, 0]], 0, 2), level2: -3,
+      },
+      phrase: [0, 0.5, 1.0, 1.25, 1.5, 2.0].map((t, i) => [i === 3 ? 43 : 40, t, 0.2, i === 3 ? 80 : 115]),
+    },
+    {
+      name: 'Pitch drop bass',
+      batch: 9,
+      about: 'Line 1 alone: each note starts an octave up and drops in 80 ms, a Saw into the Sine fold with the fold following the drop.',
+      params: {
+        lines: 0, wave1: 0, warp1: 0.5, wenvdepth1: 0, sfamily1: 1, fold1: 1, shape1: 0.2, senvdepth1: 0.5, shapekey1: 0,
+        penvdepth1: 12, ...env('penv', 1, [[0.001, 1], [0.08, 0]], 0, 2), ...env('senv', 1, [[0.001, 1], [0.2, 0.2]], 2, 3), ...env('aenv', 1, [[0.002, 1], [0.4, 0.7], [0.1, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 0.35], [33, 0.5, 0.2], [36, 0.75, 0.35], [31, 1.25, 0.6]],
+    },
+    {
+      name: 'LFO wobble',
+      batch: 9,
+      about: 'Line 1 alone: a Saw into Tanh, LFO 1 (a sine, ⅛ notes at 120 BPM) on Shape, LFO 2 (random, ¼ notes) on Warp.',
+      params: {
+        lines: 0, wave1: 0, warp1: 0.4, wenvdepth1: 0, sfamily1: 2, sat1: 0, shape1: 0.45, shapekey1: 0,
+        lfo1shape: 0, lfo1sync: 1, lfo1div: 3, lfo1dest1: 23, lfo1depth1: 0.45,
+        lfo2shape: 4, lfo2sync: 1, lfo2div: 5, lfo2dest1: 11, lfo2depth1: 0.3,
+        ...env('aenv', 1, [[0.01, 1], [3, 1], [0.3, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 1.9], [43, 2.0, 1.9]],
+    },
+    {
+      name: 'Twist envelope',
+      batch: 9,
+      about: 'Line 1 alone: a cosine with mod envelope 1 on Twist: each note starts as a saw and relaxes to a pure tone in half a second.',
+      params: {
+        lines: 0, warp1: 0, wenvdepth1: 0, menv1dest1: 41, menv1depth1: 0.6, ...env('menv', 1, [[0.002, 1], [0.5, 0]], 0, 2),
+        ...env('aenv', 1, [[0.005, 1], [0.8, 0.8], [0.3, 0]], 2, 3),
+      },
+      phrase: [[48, 0, 0.7], [55, 0.8, 0.7], [52, 1.6, 0.7], [60, 2.4, 1.2]],
+    },
+  ];
+
+  // presets made before the second line (batches 02–08) play line 1 alone, as they were made
+  PRESETS.forEach((pr) => { if (!pr.batch && pr.params.lines === undefined) pr.params = { lines: 0, ...pr.params }; });
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };
+  else root.PretzelPresets = PRESETS;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const X = window.PRETZEL, PTAB = {};
+  for (const d of X.PARAMS) PTAB[d.id] = d;
+  const NH = X.NH;
+  /* ---------- formats ---------- */
+  const pct = v => Math.round(v * 100) + '%';
+  const spct = v => (v > 0.0049 ? '+' : v < -0.0049 ? '−' : '') + Math.round(Math.abs(v) * 100) + '%';
+  const sgn = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d || 0);
+  const secs = v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s';
+  const dB = v => v <= -47.9 ? 'Off' : sgn(v, 1) + ' dB';
+  const hzF = f => f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : f.toFixed(f < 100 ? 1 : 0) + ' Hz';
+  const SHORT_WAVES = ['Saw', 'Square', 'Pulse', 'Dbl sine', 'Saw-pulse', 'Reso', 'Dbl pulse'];
+  const SHORT_WIN = ['None', 'Saw', 'Tri', 'Trap', 'Pulse', 'Dbl saw'];
+  const BEAT_NAMES = ['1/32', '1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar', '2 bars', '4 bars'];
+  const DEST_NAMES = { pitch: 'Pitch', level: 'Level', detune: 'Detune', warp: 'Warp', vecx: 'Vector x', vecy: 'Vector y', ratio: 'Sync ratio', shape: 'Shape', bias: 'Bias', tilt: 'Tilt', oddeven: 'Odd/Even', morph: 'Drawn morph', ordermorph: 'Order morph', twist: 'Twist' };
+  const DEST_OPTS = ['None'];
+  for (const id of X.DEST_IDS) for (const w of ['both lines', 'line 1', 'line 2']) DEST_OPTS.push(DEST_NAMES[id] + ' · ' + w);
+
+  /* ---------- control specs ---------- */
+  const SPECS = [];
+  const add = (g, id, o) => SPECS.push(Object.assign({ type: 'knob', g, id }, o));
+  function lineSpecs(L) {
+    const g = n => 'g' + L + '-' + n, q = id => id + L;
+    add(g('pitch'), q('level'), { name: 'Level', fmt: dB });
+    add(g('pitch'), q('octave'), { name: 'Octave', fmt: v => sgn(v) });
+    add(g('pitch'), q('fifth'), { type: 'seg', name: 'Fifth', opts: ['Off', '+7'] });
+    add(g('pitch'), q('detune'), { name: 'Detune', fmt: v => sgn(v, 1) + ' ct' });
+    add(g('pitch'), q('penvdepth'), { name: 'Pitch env', long: 'Pitch envelope depth', fmt: v => sgn(v, 1) + ' st' });
+    add(g('pitch'), q('velamp'), { name: 'Vel → amp', fmt: pct });
+    add(g('warp'), q('wfamily'), { type: 'seg', name: 'Family', opts: X.FAMILIES });
+    add(g('warp'), q('warp'), { name: 'Warp', big: true, fmt: pct });
+    add(g('warp'), q('wenvdepth'), { name: 'Env', long: 'Warp envelope depth', fmt: spct });
+    add(g('warp'), q('warpkey'), { name: 'Key', long: 'Warp key follow', fmt: pct });
+    add(g('warp'), q('velwarp'), { name: 'Vel', long: 'Velocity to Warp', fmt: pct });
+    add(g('warpcz'), q('wave'), { type: 'seg', name: 'Wave', opts: SHORT_WAVES });
+    add(g('warpcz'), q('pair'), { type: 'select', name: 'Pair (odd cycles)', opts: ['None'].concat(X.WAVES) });
+    add(g('warpwin'), q('window'), { type: 'seg', name: 'Window', opts: SHORT_WIN });
+    add(g('warpvec'), q('curve'), { type: 'seg', name: 'Curve', opts: ['Power', 'Sigmoid', 'Bezier'] });
+    add(g('warpvec'), q('vecx'), { name: 'Point x', long: 'Vector x (Bezier handle x) at Warp 1', fmt: v => v.toFixed(2) });
+    add(g('warpvec'), q('vecy'), { name: 'Point y', long: 'Vector y (Bezier handle y × 4) at Warp 1', fmt: v => v.toFixed(2) });
+    add(g('warpvec'), q('ratio'), { name: 'Ratio', long: 'Sync ratio at Warp 1', fmt: v => '×' + v.toFixed(2) });
+    add(g('shape'), q('sfamily'), { type: 'seg', name: 'Shaper', opts: X.SHAPERS });
+    add(g('shape'), q('shape'), { name: 'Shape', big: true, fmt: pct });
+    add(g('shape'), q('senvdepth'), { name: 'Env', long: 'Shape envelope depth', fmt: spct });
+    add(g('shape'), q('link'), { name: 'Link', long: 'The Warp envelope also drives Shape', fmt: spct });
+    add(g('shape'), q('bias'), { name: 'Bias', fmt: spct });
+    add(g('shape'), q('shapekey'), { name: 'Key', long: 'Shape key follow', fmt: pct });
+    add(g('shape'), q('velshape'), { name: 'Vel', long: 'Velocity to Shape', fmt: pct });
+    add(g('cheb'), q('tilt'), { name: 'Tilt', fmt: spct });
+    add(g('cheb'), q('oddeven'), { name: 'Odd/Even', fmt: v => Math.abs(v) < 0.005 ? 'Both' : (v > 0 ? 'Cut even ' : 'Cut odd ') + pct(Math.abs(v)) });
+    add(g('fold'), q('fold'), { type: 'seg', name: 'Fold', opts: X.FOLDS });
+    add(g('sat'), q('sat'), { type: 'seg', name: 'Curve', opts: X.SATS });
+    add(g('drawn'), q('keys'), { type: 'seg', name: 'Keyframes', opts: ['2', '3', '4'], off: 2 });
+    add(g('drawn'), q('morph'), { name: 'Morph', fmt: pct });
+    add(g('order'), q('order'), { type: 'seg', name: 'Order', opts: ['Warp → Shape', 'Shape → Warp', 'Morph'] });
+    add(g('order'), q('ordermorph'), { name: 'Morph', long: 'Order morph: 0 Warp → Shape, 1 Shape → Warp', fmt: pct });
+    add(g('order'), q('swmode'), { type: 'seg', name: 'Shape → Warp', opts: ['Read', 'Bend'] });
+    add(g('order'), q('morphway'), { type: 'seg', name: 'Morph way', opts: ['Through the warp', 'Shared'] });
+    add(g('order'), q('twist'), { name: 'Twist', big: true, fmt: v => v < 0.005 ? 'Off' : pct(v) + (v > 0.75 ? ' · chaos' : '') });
+  }
+  lineSpecs(1); lineSpecs(2);
+  add('g-lines', 'lines', { type: 'seg', name: 'Lines', opts: ['1', '2', '1 + 1′', '1 + 2'] });
+  add('g-lines', 'ring', { type: 'seg', name: 'Ring', opts: ['Off', 'On'] });
+  add('g-lines', 'noise', { type: 'seg', name: 'Noise (line 2)', opts: ['Off', 'On'] });
+  add('g-voice', 'mode', { type: 'seg', name: 'Voices', opts: ['Mono', 'Poly'] });
+  add('g-voice', 'glide', { name: 'Glide', fmt: v => v < 0.0005 ? 'Off' : secs(v) });
+  add('g-voice', 'benchvoices', { type: 'seg', name: 'Bench poly voices', opts: ['2', '4', '8'], def: 1, bench: true, long: 'How many voices the browser plays in Poly. The JavaScript engine is heavy; the plugin\'s count is set with the C++ port.' });
+  add('g-out', 'transpose', { name: 'Transpose', fmt: v => sgn(v) + ' st' });
+  add('g-out', 'bendrange', { name: 'Bend range', fmt: v => '±' + v + ' st' });
+  add('g-out', 'volume', { name: 'Volume', big: true, fmt: dB });
+  for (const n of [1, 2]) {
+    const g = 'g-lfo' + n, b = 'lfo' + n;
+    add(g, b + 'shape', { type: 'seg', name: 'Shape', opts: X.LFO_SHAPES });
+    add(g, b + 'rate', { name: 'Rate', fmt: v => v < 1 ? v.toFixed(2) + ' Hz' : v < 10 ? v.toFixed(1) + ' Hz' : Math.round(v) + ' Hz' });
+    add(g, b + 'sync', { type: 'seg', name: 'Rate is', opts: ['Free', 'Tempo'] });
+    add(g, b + 'div', { type: 'select', name: 'Cycle', opts: BEAT_NAMES });
+    add(g, b + 'retrig', { type: 'seg', name: 'Restart', opts: ['Free', 'On note'] });
+  }
+  for (const s of ['lfo1', 'lfo2', 'menv1', 'menv2']) for (const j of [1, 2]) {
+    add('g-' + s + 'd' + j, s + 'dest' + j, { type: 'select', name: 'Destination ' + j, opts: DEST_OPTS });
+    add('g-' + s + 'd' + j, s + 'depth' + j, { name: 'Depth', fmt: spct });
+  }
+  for (const s of ['wheel', 'at']) {
+    add('g-' + s, s + 'dest', { type: 'select', name: 'Destination', opts: DEST_OPTS });
+    add('g-' + s, s + 'depth', { name: 'Depth', fmt: spct });
+  }
+  for (const s of SPECS) { const d = PTAB[s.id]; if (d) { for (const k of ['min', 'max', 'def', 'step', 'log', 'curve']) if (s[k] === undefined && d[k] !== undefined) s[k] = d[k]; } }
+  // every engine parameter has a control: a knob, a switch, or an envelope, harmonic or keyframe editor
+  const covered = id => SPECS.some(s => s.id === id) || /^(aenv|wenv|senv|penv|menv)\d(t|l)\d$|^(aenv|wenv|senv|penv|menv)\d(sus|end)$|^h\d+_\d$/.test(id);
+  for (const d of X.PARAMS) if (!covered(d.id)) console.warn('no control for', d.id);
+
+  /* ---------- the line pages ---------- */
+  for (const L of [1, 2]) {
+    const page = document.getElementById('page-l' + L), dot = L === 1 ? 'dot' : 'dot g';
+    page.innerHTML =
+      '<div class="rows">' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Warp (phase distortion)</legend><div class="knobs" id="g' + L + '-warp"></div>' +
+        '<div class="part" id="g' + L + '-warpcz"></div><div class="part" id="g' + L + '-warpvec"></div><div class="part" id="g' + L + '-warpwin"></div></fieldset>' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Shape (waveshaping)</legend><div class="knobs" id="g' + L + '-shape"></div>' +
+        '<div class="part" id="g' + L + '-cheb"><div class="edit bars wide"><canvas id="bars' + L + '" aria-label="Chebyshev harmonics 1 to 16: drag to set"></canvas><div class="row">Harmonics 1–16 · drag to draw<span class="ro" id="barsRo' + L + '"></span></div></div></div>' +
+        '<div class="part" id="g' + L + '-fold"></div><div class="part" id="g' + L + '-sat"></div>' +
+        '<div class="part" id="g' + L + '-drawn"><div class="frames" id="frames' + L + '"></div></div></fieldset>' +
+      '<fieldset><legend><span class="' + dot + '"></span>Order and Twist</legend><div class="knobs" id="g' + L + '-order"></div></fieldset>' +
+      '<fieldset><legend><span class="' + dot + '"></span>Pitch and level</legend><div class="knobs" id="g' + L + '-pitch"></div></fieldset>' +
+      '<fieldset style="flex-basis:100%"><legend><span class="' + dot + '"></span>Envelopes</legend><div id="env' + L + '"></div></fieldset>' +
+      '</div>';
+  }
+  {
+    const host = document.getElementById('mods');
+    const box = (title, inner) => { const f = document.createElement('fieldset'); f.innerHTML = '<legend><span class="dot"></span>' + title + '</legend>' + inner; host.appendChild(f); };
+    for (const n of [1, 2]) box('LFO ' + n, '<div class="knobs" id="g-lfo' + n + '"></div><div class="part" id="g-lfo' + n + 'd1"></div><div class="part" id="g-lfo' + n + 'd2"></div>');
+    for (const n of [1, 2]) box('Mod envelope ' + n, '<div id="menvEd' + n + '"></div><div class="part" id="g-menv' + n + 'd1"></div><div class="part" id="g-menv' + n + 'd2"></div>');
+    box('Mod wheel', '<div class="knobs" id="g-wheel"></div>');
+    box('Aftertouch', '<div class="knobs" id="g-at"></div>');
+  }
+
+  /* ---------- audio ---------- */
+  let ctx = null, node = null, analyser = null, ready = false, starting = null;
+  const state = {};
+  const queue = [];
+  function send(msg) { if (ready) node.port.postMessage(msg); else queue.push(msg); }
+  function showError(t) { const e = document.getElementById('err'); e.style.display = 'block'; e.textContent = t; }
+  function allParams() { const all = {}; for (const d of X.PARAMS) all[d.id] = state[d.id]; return all; }
+  function start() {
+    if (starting) return starting;
+    starting = (async () => {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC({ latencyHint: 'interactive' });
+        if (!ctx.audioWorklet) throw new Error('This browser has no AudioWorklet support. Try a current Chrome, Edge, Firefox or Safari.');
+        const src = document.getElementById('dsp').textContent;
+        const blobUrl = () => URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+        const dataUrl = () => 'data:application/javascript;charset=utf-8,' + encodeURIComponent(src);
+        const tries = location.protocol === 'file:' ? [dataUrl, blobUrl] : [blobUrl, dataUrl];
+        let loaded = false, lastErr = null;
+        for (const mk of tries) { try { await ctx.audioWorklet.addModule(mk()); loaded = true; break; } catch (err) { lastErr = err; } }
+        if (!loaded) throw lastErr;
+        node = new AudioWorkletNode(ctx, 'pretzel-processor', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+        analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
+        analyser.minDecibels = -105; analyser.maxDecibels = -20;
+        node.connect(ctx.destination); node.connect(analyser);
+        node.port.onmessage = onMsg;
+        node.onprocessorerror = () => showError('The audio engine stopped with an error. Reload the page.');
+        ready = true;
+        node.port.postMessage({ t: 'many', p: allParams() });
+        node.port.postMessage({ t: 'tempo', v: tempoNow() });
+        node.port.postMessage({ t: 'voices', n: [2, 4, 8][state.benchvoices] });
+        for (const L of [1, 2]) for (let k = 0; k < 4; k++) if (frames[L][k].changed) sendCurve(L, k);
+        while (queue.length) node.port.postMessage(queue.shift());
+        if (ctx.state !== 'running') await ctx.resume();
+        document.getElementById('power').classList.add('hide');
+      } catch (err) { showError('Audio could not start: ' + (err && err.message || err)); starting = null; }
+    })();
+    return starting;
+  }
+  document.getElementById('powerBtn').addEventListener('click', start);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) allOff(); });
+
+  /* ---------- knobs and switches ---------- */
+  const ctl = {};
+  function toNorm(s, v) {
+    if (s.log) return Math.log(v / s.min) / Math.log(s.max / s.min);
+    const x = Math.min(1, Math.max(0, (v - s.min) / (s.max - s.min)));
+    return s.curve ? Math.pow(x, 1 / s.curve) : x;
+  }
+  function fromNorm(s, n) {
+    n = Math.min(1, Math.max(0, n));
+    let v = s.log ? s.min * Math.pow(s.max / s.min, n) : s.min + (s.max - s.min) * (s.curve ? Math.pow(n, s.curve) : n);
+    if (s.step) v = Math.round(v / s.step) * s.step;
+    return v;
+  }
+  function makeKnob(s, host) {
+    const el = document.createElement('div');
+    el.className = 'knob' + (s.big ? ' big' : '');
+    el.innerHTML = '<div class="dial" tabindex="0" role="slider"><div class="cap"></div><div class="ptr"></div></div><span class="name"></span><span class="val"></span>';
+    const dial = el.firstChild, valEl = el.children[2];
+    el.children[1].textContent = s.name;
+    if (s.long) el.title = s.long;
+    dial.setAttribute('aria-label', s.long || s.name);
+    host.appendChild(el);
+    const zero = s.min < 0 && s.max > 0 ? toNorm(s, 0) : 0;
+    const k = { s, el, norm: toNorm(s, s.def) };
+    k.set = (n, quiet) => {
+      k.norm = Math.min(1, Math.max(0, n));
+      const v = fromNorm(s, k.norm);
+      if (s.step) k.norm = toNorm(s, v);
+      state[s.id] = v;
+      dial.style.setProperty('--a0', (Math.min(zero, k.norm) * 270) + 'deg');
+      dial.style.setProperty('--a1', (Math.max(zero, k.norm) * 270) + 'deg');
+      dial.querySelector('.ptr').style.transform = 'rotate(' + (-135 + k.norm * 270) + 'deg)';
+      const txt = s.fmt(v);
+      valEl.textContent = txt;
+      dial.setAttribute('aria-valuetext', txt);
+      if (!quiet) send({ t: 'p', id: s.id, v });
+      changed();
+    };
+    let dragY = null, startN = 0;
+    dial.addEventListener('pointerdown', e => { dial.setPointerCapture(e.pointerId); dragY = e.clientY; startN = k.norm; dial.focus(); e.preventDefault(); });
+    dial.addEventListener('pointermove', e => {
+      if (dragY === null) return;
+      const r = startN + (dragY - e.clientY) * (e.shiftKey ? 0.0008 : 0.005);
+      k.set(r);
+      if (e.shiftKey) { dragY = e.clientY; startN = r; }
+    });
+    const end = () => { dragY = null; };
+    dial.addEventListener('pointerup', end); dial.addEventListener('pointercancel', end);
+    dial.addEventListener('dblclick', () => k.set(toNorm(s, s.def)));
+    dial.addEventListener('wheel', e => { e.preventDefault(); k.set(k.norm - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)); }, { passive: false });
+    dial.addEventListener('keydown', e => {
+      const st = s.step ? 1 / ((s.max - s.min) / s.step) : (e.shiftKey ? 0.005 : 0.02);
+      let used = true;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') k.set(k.norm + st);
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') k.set(k.norm - st);
+      else if (e.key === 'Home') k.set(0);
+      else if (e.key === 'End') k.set(1);
+      else used = false;
+      if (used) { e.preventDefault(); e.stopPropagation(); }
+    });
+    k.setValue = (v, quiet) => k.set(toNorm(s, v), quiet);
+    k.set(k.norm, true);
+    ctl[s.id] = k;
+  }
+  // a switch: button i is value i + off (Keyframes 2–4 are buttons 0–2)
+  function makeSeg(s, host) {
+    const off = s.off || 0;
+    const w = document.createElement('div'); w.className = 'segwrap';
+    w.innerHTML = '<span></span><div class="seg" role="group"></div>';
+    w.firstChild.textContent = s.name;
+    if (s.long) w.title = s.long;
+    const seg = w.lastChild; seg.setAttribute('aria-label', s.name);
+    const btns = s.opts.map((o, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = o; b.dataset.v = i + off; seg.appendChild(b); return b; });
+    host.appendChild(w);
+    const g = { s, el: w };
+    g.setValue = (v, quiet) => {
+      v = Math.round(v); state[s.id] = v;
+      btns.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === v)));
+      if (!quiet) {
+        if (s.bench) { allOff(); send({ t: 'voices', n: [2, 4, 8][v] }); }
+        else send({ t: 'p', id: s.id, v });
+        if (s.id === 'mode') releaseKeys();
+      }
+      changed();
+    };
+    btns.forEach(b => b.addEventListener('click', () => g.setValue(+b.dataset.v)));
+    g.setValue(s.def, true);
+    ctl[s.id] = g;
+  }
+  function makeSelect(s, host) {
+    const w = document.createElement('div'); w.className = 'segwrap';
+    w.innerHTML = '<span></span><select></select>';
+    w.firstChild.textContent = s.name;
+    const el = w.lastChild; el.setAttribute('aria-label', s.name);
+    s.opts.forEach((o, i) => { const op = document.createElement('option'); op.value = i; op.textContent = o; el.appendChild(op); });
+    el.addEventListener('keydown', e => e.stopPropagation());
+    host.appendChild(w);
+    const g = { s, el: w };
+    g.setValue = (v, quiet) => {
+      v = Math.round(v); state[s.id] = v; el.value = String(v);
+      if (!quiet) send({ t: 'p', id: s.id, v });
+      changed();
+    };
+    el.addEventListener('change', () => g.setValue(+el.value));
+    g.setValue(s.def, true);
+    ctl[s.id] = g;
+  }
+  let built = false;
+  for (const d of X.PARAMS) state[d.id] = d.def;
+  for (const s of SPECS) {
+    const host = document.getElementById(s.g);
+    if (!host) { console.warn('no group', s.g); continue; }
+    if (s.type === 'knob') makeKnob(s, host); else if (s.type === 'seg') makeSeg(s, host); else makeSelect(s, host);
+  }
+
+  /* ---------- canvas helpers ---------- */
+  function fit(c) {
+    const d = window.devicePixelRatio || 1, r = c.getBoundingClientRect();
+    const W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    return d;
+  }
+  const LCD = 'rgba(255,201,148,', ORANGE = '#f5821f', GREEN = '#61bb46';
+  const lineCol = L => L === 1 ? ORANGE : GREEN;
+  function dragOn(c, fn, end) {
+    let on = false;
+    const at = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e]; };
+    c.addEventListener('pointerdown', e => { on = true; c.setPointerCapture(e.pointerId); fn(...at(e), true); e.preventDefault(); });
+    c.addEventListener('pointermove', e => { if (on) fn(...at(e), false); });
+    const stop = () => { if (on) { on = false; if (end) end(); } };
+    c.addEventListener('pointerup', stop); c.addEventListener('pointercancel', stop);
+  }
+
+  /* ---------- envelope editors: eight stages, time and level each, a sustain point and an end ---------- */
+  const envEds = [];
+  const ENV_NAMES = { aenv: 'Amp', wenv: 'Warp', senv: 'Shape', penv: 'Pitch', menv: 'Mod' };
+  function makeEnvEditor(host, prefixes, col) {
+    const wrap = document.createElement('div'); wrap.className = 'edit';
+    wrap.innerHTML = '<div class="row"></div><canvas></canvas><div class="row"><label>Stages <select class="end"></select></label><label>Sustain at <select class="sus"></select></label><span class="ro"></span></div>';
+    host.appendChild(wrap);
+    const top = wrap.children[0], c = wrap.children[1], endSel = wrap.querySelector('.end'), susSel = wrap.querySelector('.sus'), ro = wrap.querySelector('.ro');
+    for (let i = 1; i <= 8; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; endSel.appendChild(o); }
+    for (let i = 0; i <= 8; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i ? 'stage ' + i : 'none'; susSel.appendChild(o); }
+    for (const s of [endSel, susSel]) s.addEventListener('keydown', e => e.stopPropagation());
+    const ed = { c, prefix: prefixes[0], col };
+    if (prefixes.length > 1) {
+      const seg = document.createElement('div'); seg.className = 'seg';
+      prefixes.forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.textContent = ENV_NAMES[p.replace(/\d$/, '')]; b.dataset.p = p; seg.appendChild(b); });
+      seg.addEventListener('click', e => { const p = e.target.dataset && e.target.dataset.p; if (p) { ed.prefix = p; ed.sync(); } });
+      top.appendChild(seg);
+      ed.seg = seg;
+    } else top.remove();
+    const T = s => PTAB[ed.prefix + 't' + s], tId = s => ed.prefix + 't' + s, lId = s => ed.prefix + 'l' + s;
+    const setP = (id, v) => { state[id] = v; send({ t: 'p', id, v }); changed(); };
+    endSel.addEventListener('change', () => setP(ed.prefix + 'end', +endSel.value));
+    susSel.addEventListener('change', () => setP(ed.prefix + 'sus', +susSel.value));
+    ed.sync = () => {
+      endSel.value = String(state[ed.prefix + 'end']); susSel.value = String(state[ed.prefix + 'sus']);
+      if (ed.seg) for (const b of ed.seg.children) b.setAttribute('aria-pressed', String(b.dataset.p === ed.prefix));
+      ed.draw();
+    };
+    // x: each stage takes its time's knob travel (time^⅓) of one slot; the slot fits the stages in use
+    const geom = () => {
+      const end = state[ed.prefix + 'end'], slot = 1 / Math.max(3, end);
+      const pts = [[0, 0]]; let x = 0;
+      for (let s = 1; s <= end; s++) { x += toNorm(T(s), state[tId(s)]) * slot; pts.push([x, state[lId(s)]]); }
+      return { end, slot, pts };
+    };
+    let hot = 0, sel = 0;
+    ed.draw = () => {
+      const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 8 * d;
+      const { end, pts } = geom(), sus = state[ed.prefix + 'sus'];
+      const px = u => pad + u * (W - 2 * pad), py = v => H - pad - v * (H - 2 * pad);
+      x.clearRect(0, 0, W, H);
+      x.fillStyle = LCD + '.1)'; x.fillRect(pad, py(0), W - 2 * pad, 1); x.fillRect(pad, py(1), W - 2 * pad, 1);
+      x.strokeStyle = ed.col; x.lineWidth = 1.8 * d; x.beginPath();
+      pts.forEach(([u, v], i) => i ? x.lineTo(px(u), py(v)) : x.moveTo(px(u), py(v))); x.stroke();
+      if (sus > 0 && sus <= end) { x.fillStyle = LCD + '.5)'; x.fillRect(px(pts[sus][0]), pad, 1 * d, H - 2 * pad); x.font = (9 * d) + 'px Monaco, monospace'; x.fillText('SUSTAIN', px(pts[sus][0]) + 4 * d, pad + 9 * d); }
+      for (let s = 1; s <= end; s++) {
+        x.fillStyle = s === sel ? '#fff' : ed.col; x.beginPath(); x.arc(px(pts[s][0]), py(pts[s][1]), (s === sel ? 4.5 : 3.5) * d, 0, 2 * Math.PI); x.fill();
+      }
+      const s = sel || 1;
+      ro.textContent = 'stage ' + s + ' · ' + secs(state[tId(s)]) + ' · level ' + pct(state[lId(s)]);
+    };
+    let grab = null;
+    dragOn(c, (u, v, e, first) => {
+      const pad = 8 / c.getBoundingClientRect().width, g = geom();
+      const uu = (u - pad) / (1 - 2 * pad), vv = 1 - (v - 0.06) / 0.88;
+      if (first) {
+        let best = 0, bd = 1e9;
+        for (let s = 1; s <= g.end; s++) { const dd = Math.hypot((g.pts[s][0] - uu) * 4, g.pts[s][1] - vv); if (dd < bd) { bd = dd; best = s; } }
+        sel = best; grab = { s: best, u0: uu, n0: toNorm(T(best), state[tId(best)]) };
+      }
+      if (!grab) return;
+      const s = grab.s;
+      const n = Math.min(1, Math.max(0, grab.n0 + (uu - grab.u0) / g.slot));
+      setP(tId(s), fromNorm(T(s), n));
+      setP(lId(s), Math.min(1, Math.max(0, vv)));
+      ed.draw();
+    }, () => { grab = null; });
+    envEds.push(ed);
+    ed.sync();
+    return ed;
+  }
+  for (const L of [1, 2]) makeEnvEditor(document.getElementById('env' + L), ['aenv' + L, 'wenv' + L, 'senv' + L, 'penv' + L], lineCol(L));
+  for (const n of [1, 2]) makeEnvEditor(document.getElementById('menvEd' + n), ['menv' + n], ORANGE);
+
+  /* ---------- Chebyshev harmonics ---------- */
+  const barEds = {};
+  for (const L of [1, 2]) {
+    const c = document.getElementById('bars' + L), ro = document.getElementById('barsRo' + L);
+    const id = k => 'h' + k + '_' + L;
+    const draw = () => {
+      const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 6 * d, bw = (W - 2 * pad) / NH;
+      x.clearRect(0, 0, W, H);
+      for (let k = 1; k <= NH; k++) {
+        const v = state[id(k)], h = v * (H - 2 * pad - 10 * d);
+        x.fillStyle = v > 0 ? lineCol(L) : LCD + '.15)';
+        x.fillRect(pad + (k - 1) * bw + 2 * d, H - pad - 10 * d - Math.max(h, 1 * d), bw - 4 * d, Math.max(h, 1 * d));
+        x.fillStyle = LCD + '.6)'; x.font = (8 * d) + 'px Monaco, monospace'; x.textAlign = 'center';
+        x.fillText(String(k), pad + (k - 0.5) * bw, H - pad);
+      }
+    };
+    let last = null;
+    dragOn(c, (u, v, e, first) => {
+      const k = Math.min(NH, Math.max(1, Math.floor(u * NH) + 1)), val = Math.round(Math.min(1, Math.max(0, 1 - (v - 0.07) / 0.78)) * 100) / 100;
+      const from = first || last === null ? k : last;
+      for (let j = Math.min(from, k); j <= Math.max(from, k); j++) { state[id(j)] = val; send({ t: 'p', id: id(j), v: val }); }
+      last = k; ro.textContent = 'harmonic ' + k + ' · ' + pct(val); draw();
+    }, () => { last = null; });
+    barEds[L] = draw;
+  }
+
+  /* ---------- drawn keyframes ---------- */
+  const frames = { 1: [], 2: [] };
+  function sendCurve(L, k) { const f = frames[L][k]; send({ t: 'curve', line: L, key: k, pts: f.y.map((y, i) => [-1 + 2 * i / 32, y]) }); }
+  for (const L of [1, 2]) {
+    const host = document.getElementById('frames' + L);
+    for (let k = 0; k < 4; k++) {
+      const w = document.createElement('div'); w.className = 'f';
+      w.innerHTML = '<canvas aria-label="Drawn keyframe ' + (k + 1) + ': drag to draw, double-click to restore"></canvas><span>Key ' + (k + 1) + '</span>';
+      host.appendChild(w);
+      const c = w.firstChild, f = { c, el: w, y: X.CURVES[k].slice(), changed: false };
+      f.draw = () => {
+        const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d');
+        x.clearRect(0, 0, W, H);
+        x.fillStyle = LCD + '.12)'; x.fillRect(0, H / 2, W, 1); x.fillRect(W / 2, 0, 1, H);
+        x.strokeStyle = LCD + '.18)'; x.beginPath(); x.moveTo(0, H); x.lineTo(W, 0); x.stroke();
+        x.strokeStyle = lineCol(L); x.lineWidth = 1.6 * d; x.beginPath();
+        f.y.forEach((y, i) => { const px = i / 32 * W, py = H / 2 - y * H * 0.46; i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.stroke();
+      };
+      let last = -1, timer = 0;
+      dragOn(c, (u, v, e, first) => {
+        const i = Math.min(32, Math.max(0, Math.round(u * 32))), y = Math.min(1, Math.max(-1, (0.5 - v) / 0.46));
+        const a = first || last < 0 ? i : last;
+        for (let j = Math.min(a, i); j <= Math.max(a, i); j++) f.y[j] = a === i ? y : f.y[a] + (y - f.y[a]) * (j - a) / (i - a);
+        f.y[i] = y; last = i; f.changed = true; f.draw();
+        if (!timer) timer = setTimeout(() => { timer = 0; sendCurve(L, k); }, 40);
+      }, () => { last = -1; sendCurve(L, k); });
+      c.addEventListener('dblclick', () => { f.y = X.CURVES[k].slice(); f.changed = false; f.draw(); sendCurve(L, k); });
+      frames[L].push(f);
+    }
+  }
+  function resetCurves() { for (const L of [1, 2]) for (let k = 0; k < 4; k++) { const f = frames[L][k]; if (f.changed) { f.y = X.CURVES[k].slice(); f.changed = false; sendCurve(L, k); } f.draw(); } }
+
+  /* ---------- pages ---------- */
+  const PAGES = ['l1', 'l2', 'voice', 'mod'];
+  function showPage(p) {
+    for (const q of PAGES) { document.getElementById('tab-' + q).setAttribute('aria-selected', String(q === p)); document.getElementById('page-' + q).hidden = q !== p; }
+    redrawEditors();
+  }
+  for (const p of PAGES) document.getElementById('tab-' + p).addEventListener('click', () => showPage(p));
+  function redrawEditors() { for (const e of envEds) e.draw(); for (const L of [1, 2]) { barEds[L](); for (const f of frames[L]) f.draw(); } }
+
+  /* ---------- what applies when ---------- */
+  function dim(id, off, why) {
+    const t = ctl[id]; if (!t) return;
+    t.el.classList.toggle('dim', off); t.el.title = off ? why : (t.s.long || '');
+  }
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.hidden = !on; };
+  function changed() {
+    if (!built) return;
+    const sel = state.lines;
+    for (const L of [1, 2]) {
+      const fam = state['wfamily' + L], sf = state['sfamily' + L], ord = state['order' + L];
+      show('g' + L + '-warpcz', fam === 0);
+      show('g' + L + '-warpvec', fam > 0);
+      for (const id of ['curve', 'vecx', 'vecy', 'ratio']) ctl[id + L].el.hidden = true;
+      if (fam === 1) { ctl['vecx' + L].el.hidden = false; ctl['vecy' + L].el.hidden = false; }
+      if (fam === 2) { ctl['curve' + L].el.hidden = false; if (state['curve' + L] === 2) { ctl['vecx' + L].el.hidden = false; ctl['vecy' + L].el.hidden = false; } }
+      if (fam === 3) ctl['ratio' + L].el.hidden = false;
+      show('g' + L + '-cheb', sf === 0); show('g' + L + '-fold', sf === 1); show('g' + L + '-sat', sf === 2); show('g' + L + '-drawn', sf === 3);
+      frames[L].forEach((f, k) => f.el.classList.toggle('dim', k >= state['keys' + L]));
+      dim('ordermorph' + L, ord !== 2, 'Works when Order is Morph');
+      dim('morphway' + L, ord !== 2, 'Works when Order is Morph');
+      dim('swmode' + L, ord === 0, 'Works when the shaper is on the phase (Shape → Warp or Morph)');
+    }
+    // line 2 in 1 + 1′ plays line 1's settings, with its own octave, fifth and detune
+    const twin = sel === 2;
+    for (const s of SPECS) if (/2$/.test(s.id) && s.g.startsWith('g2-') && !/^(octave|fifth|detune)2$/.test(s.id)) dim(s.id, sel === 0 || twin, sel === 0 ? 'Line 2 is off (Lines: 1)' : 'In 1 + 1′ line 2 plays line 1\'s settings, with its own octave, fifth and detune');
+    dim('octave2', sel === 0, 'Line 2 is off (Lines: 1)'); dim('fifth2', sel === 0, 'Line 2 is off (Lines: 1)'); dim('detune2', sel === 0, 'Line 2 is off (Lines: 1)');
+    for (const id of ['octave1', 'fifth1', 'detune1', 'level1']) dim(id, sel === 1, 'Line 1 is off (Lines: 2)');
+    dim('ring', sel < 2, 'Ring needs both lines');
+    dim('noise', sel === 0, 'Noise is on line 2');
+    dim('glide', state.mode === 1, 'Glide works in Mono');
+    dim('benchvoices', state.mode === 0, 'Mono plays one voice');
+    for (const n of [1, 2]) { dim('lfo' + n + 'rate', state['lfo' + n + 'sync'] === 1, 'The rate follows the tempo'); dim('lfo' + n + 'div', state['lfo' + n + 'sync'] === 0, 'Works when the rate follows the tempo'); }
+    for (const s of ['lfo1', 'lfo2', 'menv1', 'menv2']) for (const j of [1, 2]) dim(s + 'depth' + j, !state[s + 'dest' + j], 'Pick a destination');
+    for (const s of ['wheel', 'at']) dim(s + 'depth', !state[s + 'dest'], 'Pick a destination');
+    let any = false; for (const id of ['lfo1dest1', 'lfo1dest2', 'lfo2dest1', 'lfo2dest2', 'menv1dest1', 'menv1dest2', 'menv2dest1', 'menv2dest2', 'wheeldest', 'atdest']) if (state[id]) any = true;
+    document.getElementById('modLed').classList.toggle('on', any);
+    // editors that just appeared were sized while hidden
+    if (!redrawSoon) { redrawSoon = true; requestAnimationFrame(() => { redrawSoon = false; redrawEditors(); }); }
+  }
+  let redrawSoon = false;
+  built = true; changed();
+
+  function setValue(id, v, quiet) {
+    if (ctl[id]) ctl[id].setValue(v, quiet);
+    else state[id] = v;
+  }
+  function resetAll() {
+    for (const d of X.PARAMS) setValue(d.id, d.def, true);
+    send({ t: 'many', p: allParams() });
+    resetCurves();
+    for (const e of envEds) e.sync();
+    barEds[1](); barEds[2]();
+  }
+  document.getElementById('resetAll').addEventListener('click', () => { allOff(); resetAll(); });
+
+  /* ---------- test presets ---------- */
+  const PRESETS = window.PretzelPresets || [];
+  const sel = document.getElementById('presetSel'), about = document.getElementById('presetAbout');
+  PRESETS.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; sel.appendChild(o); });
+  sel.addEventListener('keydown', e => e.stopPropagation());
+  const showAbout = () => { const pr = PRESETS[+sel.value]; about.textContent = pr ? pr.about || '' : ''; };
+  sel.addEventListener('change', showAbout); showAbout();
+  function loadPreset() {
+    const pr = PRESETS[+sel.value]; if (!pr) return null;
+    allOff(); resetAll();
+    for (const k in pr.params) setValue(k, pr.params[k], true);
+    send({ t: 'many', p: allParams() });
+    for (const e of envEds) e.sync();
+    barEds[1](); barEds[2]();
+    return pr;
+  }
+  document.getElementById('presetLoad').addEventListener('click', loadPreset);
+  document.getElementById('presetPlay').addEventListener('click', async () => {
+    await start();
+    const pr = loadPreset(); if (!pr) return;
+    send({ t: 'play', pr: { phrase: pr.phrase, steps: pr.steps || [], sweeps: pr.sweeps || [] } });
+  });
+
+  /* ---------- bend, wheel, aftertouch, tempo ---------- */
+  const bendEl = document.getElementById('bend'), roBend = document.getElementById('roBend');
+  const sendBend = () => { send({ t: 'bend', v: +bendEl.value }); roBend.textContent = sgn(+bendEl.value * state.bendrange, 2) + ' st'; };
+  bendEl.addEventListener('input', sendBend);
+  const springBack = () => { bendEl.value = 0; sendBend(); };
+  bendEl.addEventListener('pointerup', springBack); bendEl.addEventListener('pointercancel', springBack);
+  const wheelEl = document.getElementById('wheel'), pressEl = document.getElementById('press');
+  wheelEl.addEventListener('input', () => send({ t: 'wheel', v: +wheelEl.value }));
+  pressEl.addEventListener('input', () => send({ t: 'press', v: +pressEl.value }));
+  const pressBack = () => { pressEl.value = 0; send({ t: 'press', v: 0 }); };
+  pressEl.addEventListener('pointerup', pressBack); pressEl.addEventListener('pointercancel', pressBack);
+  for (const el of [bendEl, wheelEl, pressEl]) el.addEventListener('keydown', e => e.stopPropagation());
+  bendEl.addEventListener('keyup', e => { e.stopPropagation(); springBack(); });
+  pressEl.addEventListener('keyup', e => { e.stopPropagation(); pressBack(); });
+  wheelEl.addEventListener('keyup', e => e.stopPropagation());
+  const tempoEl = document.getElementById('tempo');
+  const tempoNow = () => +tempoEl.value || 120;
+  tempoEl.addEventListener('change', () => send({ t: 'tempo', v: tempoNow() }));
+  tempoEl.addEventListener('keydown', e => e.stopPropagation());
+
+  /* ---------- PC keyboard as a MIDI keyboard (Ableton layout) ---------- */
+  const KEYMAP = { KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11,
+                   KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16 };
+  const KEYCAP = { KeyA: 'A', KeyW: 'W', KeyS: 'S', KeyE: 'E', KeyD: 'D', KeyF: 'F', KeyT: 'T', KeyG: 'G', KeyY: 'Y', KeyH: 'H', KeyU: 'U', KeyJ: 'J',
+                   KeyK: 'K', KeyO: 'O', KeyL: 'L', KeyP: 'P', Semicolon: ';' };
+  const VELS = [1, 20, 40, 60, 80, 100, 127];
+  let octave = 2, velIdx = 5;                 // Ableton naming: C3 = MIDI 60; starts at C2
+  const down = new Map(), sounding = new Map();
+  const noteName = m => ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][m % 12] + (Math.floor(m / 12) - 2);
+  function baseNote() { return (octave + 2) * 12; }
+  function noteOn(srcKey, midi) {
+    if (down.has(srcKey) || midi < 0 || midi > 127) return;
+    start();
+    down.set(srcKey, midi);
+    sounding.set(midi, (sounding.get(midi) || 0) + 1);
+    send({ t: 'on', n: midi, v: VELS[velIdx] });
+    paintKeys();
+  }
+  function noteOff(srcKey) {
+    if (!down.has(srcKey)) return;
+    const midi = down.get(srcKey); down.delete(srcKey);
+    const c = (sounding.get(midi) || 1) - 1;
+    if (c <= 0) { sounding.delete(midi); send({ t: 'off', n: midi }); } else sounding.set(midi, c);
+    paintKeys();
+  }
+  function releaseKeys() { down.clear(); sounding.clear(); paintKeys(); }
+  function allOff() { releaseKeys(); send({ t: 'panic' }); }
+  document.getElementById('panic').addEventListener('click', allOff);
+  window.addEventListener('blur', allOff);
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
+    if (e.code in KEYMAP) { e.preventDefault(); if (!e.repeat) noteOn(e.code, baseNote() + KEYMAP[e.code]); return; }
+    if (e.repeat) return;
+    if (e.code === 'KeyZ') octave = Math.max(-2, octave - 1);
+    else if (e.code === 'KeyX') octave = Math.min(8, octave + 1);
+    else if (e.code === 'KeyC') velIdx = Math.max(0, velIdx - 1);
+    else if (e.code === 'KeyV') velIdx = Math.min(VELS.length - 1, velIdx + 1);
+    else return;
+    e.preventDefault();
+    updateKeyLabels();
+  });
+  window.addEventListener('keyup', e => { if (e.code in KEYMAP) noteOff(e.code); });
+  const keysEl = document.getElementById('keys'), keyEls = [];
+  const whiteSemis = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16];
+  const isBlack = s => [1, 3, 6, 8, 10, 13, 15].includes(s);
+  Object.keys(KEYMAP).forEach(code => {
+    const semi = KEYMAP[code], el = document.createElement('div');
+    el.className = 'key ' + (isBlack(semi) ? 'b' : 'w');
+    el.dataset.semi = semi;
+    el.innerHTML = '<span class="c"></span>' + KEYCAP[code];
+    if (isBlack(semi)) { const left = whiteSemis.filter(w => w < semi).length; el.style.left = 'calc(' + (left * 10) + '% - 3.2%)'; el.style.width = '6.4%'; }
+    else { el.style.left = (whiteSemis.indexOf(semi) * 10) + '%'; el.style.width = '10%'; }
+    const pid = 'ptr' + semi;
+    el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); noteOn(pid, baseNote() + semi); e.preventDefault(); });
+    const up = () => noteOff(pid);
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    keysEl.appendChild(el); keyEls.push(el);
+  });
+  function paintKeys() { const b = baseNote(); for (const el of keyEls) el.classList.toggle('on', sounding.has(b + +el.dataset.semi)); }
+  function updateKeyLabels() {
+    const b = baseNote();
+    for (const el of keyEls) { const s = +el.dataset.semi; el.firstChild.textContent = (s % 12 === 0) ? noteName(b + s) : ''; }
+    document.getElementById('roOct').textContent = noteName(b);
+    document.getElementById('roVel').textContent = VELS[velIdx];
+    paintKeys();
+  }
+  updateKeyLabels();
+
+  /* ---------- messages from the engine ---------- */
+  const roCpu = document.getElementById('roCpu'), roVo = document.getElementById('roVo');
+  let view = [], fade = 0;
+  function onMsg(e) {
+    const m = e.data;
+    if (m.t !== 'stat') return;
+    if (m.moved) for (const id in m.moved) {
+      if (id === 'wheel') wheelEl.value = m.moved[id]; else if (id === 'aftertouch') pressEl.value = m.moved[id];
+      else setValue(id, m.moved[id], true);
+    }
+    if (m.lines.length) { view = m.lines; fade = 1; }
+    roVo.textContent = m.voices + '/' + (state.mode === 0 ? 1 : m.max);
+    const pc = v => (v * 100).toFixed(v < 0.1 ? 1 : 0) + '%';
+    roCpu.textContent = pc(m.load) + (m.peak >= 0 ? ' · PEAK ' + pc(m.peak) : '');
+    roCpu.className = m.load > 0.5 || m.peak > 0.8 ? 'warn' : '';
+  }
+
+  /* ---------- the pretzel ---------- */
+  // one closed path: the belly, both lobes, and the two arms crossing in the middle; traced once per cycle
+  const KNOT = [[-0.52, 0.6], [-0.22, 0.42], [0, 0.2], [0.1, -0.12], [0.1, -0.52], [0.3, -0.84], [0.64, -0.88], [0.94, -0.58], [1, -0.06], [0.86, 0.46], [0.5, 0.82], [0, 0.92],
+                [-0.5, 0.82], [-0.86, 0.46], [-1, -0.06], [-0.94, -0.58], [-0.64, -0.88], [-0.3, -0.84], [-0.1, -0.52], [-0.1, -0.12], [0, 0.2], [0.22, 0.42], [0.52, 0.6], [0, 0.76]];
+  const PM = 512;                     // points on the path, evenly spaced along it
+  let pathCache = null;
+  // tight 0–1 pulls the lobes in and the crossing up: Twist tightens the knot
+  function knotPath(tight) {
+    const key = Math.round(tight * 100);
+    if (pathCache && pathCache.key === key) return pathCache;
+    const t = key / 100, P = KNOT.map(([x, y]) => {
+      const up = Math.max(0, 0.6 - y) / 1.4;        // 0 at the belly, 1 at the top of the lobes
+      return [x * (1 - 0.3 * t * up), y + 0.16 * t * up * (1 - Math.abs(x))];
+    });
+    // closed Catmull-Rom, sampled finely, then resampled by arc length
+    const n = P.length, fine = [];
+    for (let i = 0; i < n; i++) {
+      const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+      for (let j = 0; j < 64; j++) {
+        const u = j / 64, u2 = u * u, u3 = u2 * u;
+        const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (-a + 3 * b - 3 * c + d) * u3);
+        fine.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+      }
+    }
+    fine.push(fine[0]);
+    const cum = [0]; for (let i = 1; i < fine.length; i++) cum.push(cum[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+    const total = cum[cum.length - 1], pts = [];
+    for (let k = 0, j = 0; k < PM; k++) {
+      const s = k / PM * total; while (cum[j + 1] < s) j++;
+      const f = (s - cum[j]) / Math.max(1e-9, cum[j + 1] - cum[j]);
+      pts.push([fine[j][0] + (fine[j + 1][0] - fine[j][0]) * f, fine[j][1] + (fine[j + 1][1] - fine[j][1]) * f]);
+    }
+    // normals: to the left of travel (outward on the belly)
+    const nor = pts.map((p, k) => { const a = pts[(k - 1 + PM) % PM], b = pts[(k + 1) % PM], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; });
+    pathCache = { key, pts, nor };
+    return pathCache;
+  }
+  const knotC = document.getElementById('knot'), knotInfo = document.getElementById('knotInfo');
+  const TICKS = 24;                   // ticks per cycle of the phase the warp reads
+  const ORDER_TXT = ['WARP → SHAPE', 'SHAPE → WARP', 'MORPH'];
+  function peakOf(a) { let m = 1e-3; for (const v of a) m = Math.max(m, Math.abs(v)); return m; }
+  // where the read phase passes each 1/TICKS step: [index + fraction, …], unwrapping the wraps
+  function tickAt(read) {
+    const N = read.length, out = [];
+    let U = read[0], prevU = U;
+    for (let i = 1; i <= N; i++) {
+      const r = read[i % N];
+      let du = r - read[i - 1]; if (du < -0.5) du += 1; else if (du > 0.5) du -= 1;
+      U = prevU + du;
+      const a = Math.floor(prevU * TICKS), b = Math.floor(U * TICKS);
+      if (a !== b) for (let q = Math.min(a, b) + 1; q <= Math.max(a, b); q++) out.push(i - 1 + (q / TICKS - prevU) / (U - prevU));
+      prevU = U;
+      if (out.length > 600) break;
+    }
+    return out;
+  }
+  function drawKnot() {
+    const d = fit(knotC), W = knotC.width, H = knotC.height, x = knotC.getContext('2d');
+    x.clearRect(0, 0, W, H);
+    const lines = view, tw = lines.reduce((m, l) => Math.max(m, Math.min(1, l.twist / 0.5)), 0) * fade;
+    const { pts, nor } = knotPath(tw);
+    const sc = Math.min(W * 0.42, (H - 30 * d) * 0.43), cx = W / 2, cy = (H - 26 * d) * 0.5;
+    const X0 = p => cx + p[0] * sc, Y0 = p => cy + p[1] * sc;
+    // the dough
+    x.lineJoin = 'round'; x.lineCap = 'round';
+    x.strokeStyle = 'rgba(201,140,70,.13)'; x.lineWidth = 22 * d; x.beginPath();
+    pts.forEach((p, k) => k ? x.lineTo(X0(p), Y0(p)) : x.moveTo(X0(p), Y0(p))); x.closePath(); x.stroke();
+    x.strokeStyle = LCD + '.18)'; x.lineWidth = 1 * d; x.stroke();
+    if (!lines.length) {
+      x.fillStyle = LCD + '.55)'; x.font = (10 * d) + 'px Monaco, monospace'; x.textAlign = 'center';
+      x.fillText('PLAY A NOTE', cx, cy + 4 * d); x.textAlign = 'left';
+      knotInfo.textContent = '';
+      return;
+    }
+    const amp = 0.11 * sc, info = [];
+    for (const l of lines) {
+      const N = l.wave.length, pk = peakOf(l.wave), col = lineCol(l.L);
+      const at = i => { const k = (i / N) * PM, j = Math.floor(k) % PM, f = k - Math.floor(k), j1 = (j + 1) % PM;
+        const wi = Math.floor(i) % N, wf = i - Math.floor(i), y = (l.wave[wi] + (l.wave[(wi + 1) % N] - l.wave[wi]) * wf) / pk;
+        const px = pts[j][0] + (pts[j1][0] - pts[j][0]) * f, py = pts[j][1] + (pts[j1][1] - pts[j][1]) * f, n = nor[j];
+        return [cx + px * sc + n[0] * y * amp, cy + py * sc + n[1] * y * amp, n]; };
+      x.globalAlpha = 0.35 + 0.65 * fade;
+      x.strokeStyle = col; x.lineWidth = 2 * d; x.shadowColor = col; x.shadowBlur = 6 * d;
+      x.beginPath();
+      for (let i = 0; i <= N; i++) { const [px, py] = at(i % N === 0 && i ? 0 : i); i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke(); x.shadowBlur = 0;
+      // ticks: even steps of the phase the warp reads; they bunch where the cycle is read fast
+      x.strokeStyle = l.L === 1 ? '#fff0df' : '#e4f7dc'; x.lineWidth = 1.2 * d;
+      x.beginPath();
+      for (const ti of tickAt(l.read)) { const [px, py, n] = at(ti); x.moveTo(px - n[0] * 5 * d, py - n[1] * 5 * d); x.lineTo(px + n[0] * 5 * d, py + n[1] * 5 * d); }
+      x.stroke();
+      // where the cycle starts
+      const [sx, sy] = at(0); x.fillStyle = col; x.beginPath(); x.arc(sx, sy, 3.5 * d, 0, 2 * Math.PI); x.fill();
+      x.globalAlpha = 1;
+      info.push('LINE ' + l.L + (l.src !== l.L ? ' (1′)' : '') + ' · ' + hzF(l.hz) + ' · WARP ' + l.warp.toFixed(2) + ' · SHAPE ' + l.shape.toFixed(2) + ' · ' + ORDER_TXT[l.order] + (l.order === 2 ? ' ' + l.tm.toFixed(2) : '') + (l.twist > 0 ? ' · TWIST' : ''));
+    }
+    knotInfo.innerHTML = info.map(s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('<br>');
+  }
+  /* ---------- side views ---------- */
+  const gC = document.getElementById('gView'), sC = document.getElementById('sView'), wC = document.getElementById('wView');
+  function plot(c, draw) {
+    const d = fit(c), W = c.width, H = c.height, x = c.getContext('2d'), pad = 6 * d, top = 16 * d;
+    x.clearRect(0, 0, W, H);
+    const PX = u => pad + u * (W - 2 * pad), PY = v => H - pad - v * (H - pad - top);
+    x.fillStyle = LCD + '.1)'; x.fillRect(PX(0), PY(0.5), W - 2 * pad, 1);
+    draw(x, PX, PY, d);
+  }
+  function curve(x, PX, PY, d, arr, f, col, alpha) {
+    x.globalAlpha = alpha; x.strokeStyle = col; x.lineWidth = 1.6 * d; x.beginPath();
+    const N = arr.length;
+    for (let i = 0; i < N; i++) { const [u, v] = f(arr[i], i, N); i ? x.lineTo(PX(u), PY(v)) : x.moveTo(PX(u), PY(v)); }
+    x.stroke(); x.globalAlpha = 1;
+  }
+  function drawSide() {
+    const a = 0.35 + 0.65 * fade;
+    plot(gC, (x, PX, PY, d) => {
+      x.strokeStyle = LCD + '.15)'; x.lineWidth = 1 * d; x.beginPath(); x.moveTo(PX(0), PY(0)); x.lineTo(PX(1), PY(1)); x.stroke();
+      for (const l of view) {
+        // a jump back is a wrap: draw it as a break
+        x.globalAlpha = a; x.strokeStyle = lineCol(l.L); x.lineWidth = 1.6 * d; x.beginPath();
+        const N = l.read.length;
+        for (let i = 0; i < N; i++) { const u = i / N, v = l.read[i]; if (i && Math.abs(v - l.read[i - 1]) > 0.5) x.moveTo(PX(u), PY(v)); else if (i) x.lineTo(PX(u), PY(v)); else x.moveTo(PX(u), PY(v)); }
+        x.stroke(); x.globalAlpha = 1;
+      }
+    });
+    plot(sC, (x, PX, PY, d) => {
+      x.strokeStyle = LCD + '.15)'; x.lineWidth = 1 * d; x.beginPath(); x.moveTo(PX(0), PY(0)); x.lineTo(PX(1), PY(1)); x.stroke();
+      for (const l of view) curve(x, PX, PY, d, l.xfer, (v, i, N) => [i / (N - 1), 0.5 + 0.5 * Math.max(-1.2, Math.min(1.2, v)) / 1.2 * 1], lineCol(l.L), a);
+    });
+    plot(wC, (x, PX, PY, d) => {
+      for (const l of view) { const pk = peakOf(l.wave); curve(x, PX, PY, d, l.wave, (v, i, N) => [i / N, 0.5 + 0.48 * v / pk], lineCol(l.L), a); }
+    });
+  }
+
+  /* ---------- spectrogram ---------- */
+  const spec = document.getElementById('spec'), axis = document.getElementById('axis');
+  const sx = spec.getContext('2d'), ax = axis.getContext('2d');
+  let fbuf = null, col = null;
+  const STOPS = [[0, 6, 6, 8], [0.35, 30, 70, 30], [0.7, 245, 130, 31], [1, 255, 246, 230]];
+  const LUT = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255; let a = STOPS[0], b = STOPS[STOPS.length - 1];
+    for (let s = 0; s < STOPS.length - 1; s++) if (t >= STOPS[s][0] && t <= STOPS[s + 1][0]) { a = STOPS[s]; b = STOPS[s + 1]; break; }
+    const u = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    for (let c = 0; c < 3; c++) LUT[i * 3 + c] = a[c + 1] + (b[c + 1] - a[c + 1]) * u;
+  }
+  function fitSpec() {
+    const r = spec.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (spec.width !== w || spec.height !== h) {
+      spec.width = w; spec.height = h; axis.width = w; axis.height = h;
+      sx.fillStyle = '#060608'; sx.fillRect(0, 0, w, h);
+      col = sx.createImageData(1, h);
+      ax.clearRect(0, 0, w, h);
+      ax.font = (9 * d) + 'px Monaco, monospace'; ax.textAlign = 'right';
+      for (const f of [5000, 10000, 15000, 20000]) {
+        const y = h - f / 20000 * (h - 2) - 1;
+        ax.fillStyle = LCD + '.18)'; ax.fillRect(0, Math.round(y), w, 1);
+        ax.fillStyle = LCD + '.7)'; ax.fillText((f / 1000) + 'k', w - 4 * d, Math.max(10 * d, y - 3 * d));
+      }
+    }
+    return d;
+  }
+  function drawSpec(stepPx) {
+    const d = fitSpec(), W = spec.width, H = spec.height;
+    const step = Math.max(1, Math.round(stepPx * d));
+    sx.drawImage(spec, -step, 0);
+    if (!analyser) { sx.fillStyle = '#060608'; sx.fillRect(W - step, 0, step, H); return; }
+    if (!fbuf) fbuf = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(fbuf);
+    const binHz = ctx.sampleRate / analyser.fftSize, lo = analyser.minDecibels, hi = analyser.maxDecibels, data = col.data;
+    for (let y = 0; y < H; y++) {
+      const fTop = (H - y) / H * 20000, fBot = (H - y - 1) / H * 20000;
+      const b0 = Math.floor(fBot / binHz), b1 = Math.max(b0 + 1, Math.ceil(fTop / binHz)); let m = -200;
+      for (let b = b0; b < b1 && b < fbuf.length; b++) if (fbuf[b] > m) m = fbuf[b];
+      const t = Math.min(1, Math.max(0, (m - lo) / (hi - lo))), li = Math.round(Math.pow(t, 1.1) * 255) * 3, o = y * 4;
+      data[o] = LUT[li]; data[o + 1] = LUT[li + 1]; data[o + 2] = LUT[li + 2]; data[o + 3] = 255;
+    }
+    for (let s = 0; s < step; s++) sx.putImageData(col, W - step + s, 0);
+  }
+
+  const slow = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = 0, lastW = 0;
+  function frame(t) {
+    const dt = last ? Math.min(0.1, (t - last) / 1000) : 1 / 60; last = t;
+    if (view.length && fade > 0) { /* the last voice stays drawn, dimmed, once it ends */ }
+    drawKnot(); drawSide();
+    if (!slow || t - lastW > 250) { lastW = t; drawSpec(Math.max(1, spec.getBoundingClientRect().width / 3 * dt)); }
+    requestAnimationFrame(frame);
+  }
+  // once no voice sounds, the last one stays drawn, dimmed
+  setInterval(() => { if (ready && roVo.textContent.startsWith('0/')) fade = Math.max(0, fade - 0.1); }, 50);
+  window.addEventListener('resize', redrawEditors);
+  redrawEditors();
+  requestAnimationFrame(frame);
+  window.__pretzel = { state, ctl, send, start, loadPreset, showPage, setValue };
+})();
+</script>
+</body>
+</html>

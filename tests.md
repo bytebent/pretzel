@@ -4,7 +4,36 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 125 engine tests passing** (about 50 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+**Now: 125 engine tests and 5 bench tests passing** (about 50 s and 3½ min). Bench tests: `node tests/bench-test.js`. Browser check: `node tools/bench/check.js` (needs Playwright). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 10 · browser bench
+
+`tools/pretzel.html`, built by `tools/bench/build.js` from the engine, the worklet wrapper
+(`tools/bench/processor.js`), the presets and `tools/bench/template.html`. One file, opens from disk.
+
+- **Plays the presets as their WAVs.** The bench's worklet code, run in Node, plays all 34 test
+  presets (phrases, steps and sweeps) sample for sample like `render-presets.js`: difference 0,
+  with the DSP meter and the live view running. So the view doesn't touch the sound.
+- **Up to date.** The test fails if `pretzel.html` wasn't rebuilt after a change to its sources.
+- **Live view** at 30 frames a second: 5,658 frames over the presets, 5,064 with a voice. A Saw at
+  Warp 0.6 reads half the cosine in the first 3.5% of the cycle, as the warp curve says.
+- **Bench voices.** 2 / 4 / 8 switch; with 2, a four-note chord plays two.
+- **In Chromium** (headless, `tools/bench/check.js`): powers on, plays every preset, opens every
+  page. No console errors or warnings; every preset sounds. Highest DSP reading 62% of a core (this
+  container, 4 voices).
+- Every engine parameter has a control: a knob, a switch, or the envelope, harmonic or keyframe
+  editors. The page warns in the console if one is missing; none are.
+
+The live view (design.md §12): line 1 orange, line 2 green. The line is the wave, bent out from the
+pretzel. Ticks mark even steps of the phase the warp reads. Below, CZ Duo (line 2 is Resonance: its
+ticks go round eight times); then Knot to chaos (Shape → Warp with Twist: the knot is drawn tight,
+where the warp holds, the ticks leave long gaps).
+
+![The bench playing CZ Duo](docs/tests/10-bench-duo.png)
+
+![Knot to chaos](docs/tests/10-bench-knot.png)
+
+Whole page: [docs/tests/10-bench.png](docs/tests/10-bench.png).
 
 ## Batch 09 · two lines and modulation
 

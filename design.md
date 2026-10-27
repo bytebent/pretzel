@@ -452,21 +452,28 @@ Each one checks one claim of the design. [Decided]
 The wave is drawn **around a pretzel**: one closed path with two loops that cross, like the knot of
 a pretzel. One trip around the path is one cycle of the wave. [Decided: the idea]
 
-How it shows the two axes [Decided; the bench tunes the details]:
+How it shows the two axes [Decided; built in the bench, batch 10]:
 
-- **The level bends the path.** The wave's value pushes the line out from the pretzel or in toward
-  its middle. A pure cosine is a gentle ripple around the shape. Shaping makes the ripple sharp,
-  folded or flattened.
-- **The warp moves the ticks.** Small ticks sit at even steps of time along the path. Warp bunches
-  them where the cycle is read fast and spreads them where it is read slowly. At Warp 0 they are
-  evenly spaced.
-- **Order shows as which happens first.** The ticks move, then the line bends, or the reverse.
-  Morph animates between the two.
-- **Twist pulls the knot tighter.** The path itself tightens as feedback rises.
-- **One line, or both.** Two lines draw as two colours on the same pretzel.
+- **The level bends the path.** One trip around the pretzel is one cycle of time. The wave's value
+  pushes the line out from the pretzel or in toward its middle, so the line is the real wave. A
+  pure cosine is a gentle ripple around the shape. Shaping makes the ripple sharp, folded or
+  flattened.
+- **The warp moves the ticks.** Small ticks sit at even steps of the phase the warp reads (24 per
+  cycle of the cosine). At Warp 0 they are evenly spaced. Warp bunches them where the cycle is read
+  fast and leaves gaps where it holds. A Resonance or Sync ratio of 8 gives 8 rounds of ticks.
+  (The first draft put the ticks at even steps of time; with the path traced in time, that shows
+  nothing. Even steps of the read phase show the warp.)
+- **Order shows as which happens first.** With the shaper on the phase (Shape → Warp), Shape moves
+  the ticks; after the warp, it bends the line. Morph moves between the two. The order is written
+  under the view.
+- **Twist pulls the knot tighter.** The lobes draw in and the crossing rises as Twist goes up.
+- **One line, or both.** Line 1 is orange, line 2 green, on the same pretzel. A dot marks where
+  the cycle starts.
 
-Smaller views beside it: the warp curve g, the transfer curve S, and the plain wave on a straight
-line, for anyone who wants the numbers. [Decided]
+Smaller views beside it: the warp curve g (the read phase over one cycle), the transfer curve S at
+the Shape it has now, and the plain wave on a straight line. [Decided]
+
+The view shows the newest voice. When it ends, the last picture stays, dimmed.
 
 ## 13. Code architecture
 
@@ -494,5 +501,6 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 
 1. Twist: what it sounds like across pitches and shapers, and where the chaos should start (listening).
 2. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
-3. How many voices the browser bench plays.
+3. ~~How many voices the browser bench plays.~~ Settled in batch 10: 4 by default, with a 2 / 4 / 8
+   switch on the Voice page (the JavaScript engine needs about 20% of a core per full voice).
 4. Smoothing the creases of a fold on the phase (Shape → Warp), if they are heard.
