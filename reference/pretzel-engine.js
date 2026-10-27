@@ -597,6 +597,7 @@
       this.sh = makeShaper();
       this.dcx = 0; this.dcy = 0; this.gain = 1;
       this.x1 = 0;               // the wave one sample back
+      this.frPrev = 0; this.snap = true;   // pitch at the end of the last block; start the next at its own
       this.acc = 0; this.bps = new Float64Array(4);   // split samples: running sum, breakpoints
       this.q0 = 0; this.carry = 0;                     // the sample waiting for its residuals, and the next one's
       this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
@@ -608,7 +609,7 @@
       this.note = note;
       this.targetOct = (note - 69) / 12;
       const g = this.eng.p[PINDEX.glide];
-      if (!glide || g <= 0) { this.oct = this.targetOct; this.glideStep = 0; }
+      if (!glide || g <= 0) { this.oct = this.targetOct; this.glideStep = 0; this.snap = true; }
       else this.glideStep = Math.abs(this.targetOct - this.oct) / (g * this.eng.srOS);
     }
     trigger(vel) {
@@ -703,7 +704,12 @@
       const dOct = this.targetOct - this.oct, step = this.glideStep * n;
       this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
       const k = this.settings(), sh = this.sh;
-      const { inc, vw, vs, va, wbase, wdepth, sbase, sdepth, link, w0, w1, win } = k;
+      const { vw, vs, va, wbase, wdepth, sbase, sdepth, link, w0, w1, win } = k;
+      // pitch moves smoothly across the block (a glide steps once per block otherwise, and the pitch cap
+      // that follows it put a whistle at −49 dB near 12 kHz); a new note starts at its own pitch
+      const fr1 = k.fr, cap1 = k.cap, kHost1 = k.kHost, kOS1 = k.kOS;
+      const fr0 = this.snap || !(this.frPrev > 0) ? fr1 : this.frPrev, dfr = (fr1 - fr0) / n;
+      this.snap = false; this.frPrev = fr1;
       const R = e.dcR;
       // level: measured at the Warp and Shape the block starts with, moved to across the block
       const sb0 = this.shapeAt(this.wenv.v, this.senv.v);
@@ -714,6 +720,8 @@
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
       const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
       for (let i = 0; i < n; i++) {
+        const fri = fr0 + dfr * (i + 1), q = fri / fr1, inc = fri;
+        k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
         const we = wenv.next(), se = senv.next(), ae = aenv.next();
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
         const s = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;

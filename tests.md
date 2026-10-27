@@ -56,6 +56,18 @@ What it took, in the order it was found:
    log1p(2·sinh²(u/2)) for small u. A test checks every family at tiny Shapes. After the fix, no
    render has more energy above 10 kHz than in batch 03 anywhere (largest +1 dB).
 
+**What aliasing is, in a picture** (made after you asked): one note gliding from MIDI 60 up to 100
+through the Sine fold, rendered three ways. Real harmonics rise with the pitch; aliases are the
+lines that fall or wander while it rises.
+
+![A glide rendered with no band limiting, with 4× only, and with batch 04](docs/tests/04-aliasing-explained.png)
+
+Chasing a faint line near 12 kHz in that glide (−49 dB below the loudest harmonic), I first
+blamed the pitch cap stepping once per 32-sample block during a glide. The pitch now moves
+smoothly within each block, which is better anyway, but the line stayed: it is this setting's
+ordinary aliasing, at the same level in all three versions (the same settings held on one note
+measure −54 to −62 dB).
+
 Also tested: every shaper's antiderivative has the shaper as its slope (5.7e−8); the Analog
 folder, now a table, matches the Lambert W form to 1.5e−6 (and is much faster).
 
