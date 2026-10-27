@@ -5,7 +5,7 @@ CZ, bends **time**: how fast each part of the cycle is read. Waveshaping bends *
 Chebyshev harmonics, folding, saturation or a drawn curve. Pretzel chains the two, lets you swap
 or morph their order, and can feed the shaped wave back into its own phase (Twist).
 
-Status: **prototype, batch 08 of 13**. The reference engine plays one line: the warp (the CZ waves and windows, the hidden ones, a window on any wave, wave pairs; and the Vector, Smooth and Sync families) into the shaper (Chebyshev, three folders, three saturators, drawn curves with Morph), in either order or morphing between them, with Twist feeding the shaped wave back into its own phase, and 8-stage Warp, Shape and Amp envelopes and Link, in Poly or Mono. The whole chain is band-limited (ADAA, split samples at jumps, the Chebyshev fade, a chain-aware pitch cap). The cost benchmark runs on GitHub's Intel Mac on every push. Next: the second line and modulation.
+Status: **prototype, batch 09 of 13**. The reference engine plays the whole voice: two lines (1, 2, 1+1′, 1+2, Ring, Noise), each a warp (the CZ waves and windows, the hidden ones, a window on any wave, wave pairs; and the Vector, Smooth and Sync families) and a shaper (Chebyshev, three folders, three saturators, drawn curves with Morph) in either order or morphing between them, with Twist feeding the shaped wave back into its own phase; 8-stage Pitch, Warp, Shape and Amp envelopes per line; 2 LFOs, 2 mod envelopes, the mod wheel and aftertouch per voice; Poly or Mono. The whole chain is band-limited. Every push runs the tests and the benchmark on GitHub's Intel Mac. Next: the browser bench.
 
 - `design.md`: what Pretzel is and how it works
 - `plan.md`: build batches

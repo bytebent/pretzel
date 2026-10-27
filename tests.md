@@ -4,7 +4,40 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 113 engine tests passing** (about 40 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+**Now: 125 engine tests passing** (about 50 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 09 · two lines and modulation
+
+The voice now has two lines (1, 2, 1+1′, 1+2), Ring and Noise, per-line Level, Octave, Fifth,
+Detune and a pitch envelope, and per voice 2 LFOs, 2 mod envelopes, the mod wheel and aftertouch,
+each with destinations on either line.
+
+- **The refactor first.** Splitting the voice into lines changed nothing: with Line select 1, all
+  27 earlier presets are bit-identical to batch 08. Presets made before this batch now say Line
+  select 1; the engine's default is 1+2, as designed.
+- **1+1′** with no detune is exactly line 1 doubled (each line 3 dB down: √2 × line 1, to 1e−7).
+  **Line 2 alone** with line 1's settings is line 1 bit for bit. Octave and Fifth land in tune.
+- **Ring:** two cosines a fifth apart give their sum and difference, and line 2's own pitch is gone
+  (−119 dB).
+- **Noise:** line 2 becomes noise (energy between the harmonics +8 dB above them), the same at any
+  buffer size.
+- **Pitch envelope:** +12 semitones falling over 0.4 s: 428 Hz at the start, 220.00 Hz once it lands.
+- **Two lines together** sit within 2.1 dB of one line alone.
+- **Modulation:** every destination (pitch, level, detune, Warp, Vector x and y, Sync ratio, Shape,
+  Bias, Tilt, Odd/Even, Morph, Order Morph, Twist) moves the sound from an LFO; the wheel, aftertouch
+  and a mod envelope (on Twist) work. A square LFO synced to ¼ notes at 120 BPM repeats every
+  0.500 s. With every modulator running (random LFO, noise, envelopes, the wheel), host buffers of
+  128, 37 and 1 sample give the same output bit for bit.
+- **The design presets now use them:** Vowel moves Vector x with the mod wheel (it came out
+  bit-identical to the old programmed sweep), and Turning moves Morph with a slow triangle LFO.
+- **Cost of a full voice**, measured for the first time (two lines, shared Morph, Twist, both LFOs
+  and mod envelopes, 8 voices): 159% of one core here in JavaScript, 20% per voice, as batch 05's
+  projection said. The C++ port decides the voice count (batch 11).
+
+![Spectrograms of the new presets, and the new Vowel and Turning](docs/tests/09-spectrograms.png)
+
+Renders: CZ Duo (1+2), 1+1′ chorus, Ring bell, Noise hit, Pitch drop bass, LFO wobble, Twist
+envelope; Vowel and the two Turning presets again (now with the wheel and an LFO).
 
 ## Batch 08 · Twist
 

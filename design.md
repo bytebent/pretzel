@@ -67,14 +67,18 @@ A **line** is one complete oscillator: its own wave, warp, shaper and envelopes,
 level. It is the CZ's word. A voice with two lines is two of these, layered, detuned or
 ring-modulated. [Decided: two lines, called lines]
 
-- **Line select**, as on the CZ [Decided]:
+- **Line select**, as on the CZ [Decided; built in batch 09]:
   - 1;
   - 2;
-  - 1+1′: two copies of line 1, the second detuned;
-  - 1+2: both lines.
-- **Ring**: line 2 is multiplied by line 1. **Noise**: line 2's pitch is jittered by noise, as on
-  the CZ. [Decided]
-- **Detune** between lines: in cents, plus octave and fifth steps. [Decided]
+  - 1+1′: line 1 played twice, the copy with line 2's octave, fifth and detune;
+  - 1+2: both lines (the default; line 2 starts 7 cents sharp).
+  Two lines together are each 3 dB down, so the pair sits near one line's level. Presets made
+  before batch 09 set Line select to 1, as they were made.
+- **Ring**: line 2 (with its own envelope) is multiplied by line 1's wave, at twice the gain; line
+  1 still sounds. **Noise**: line 2's pitch jumps by up to ±90% every internal sample, from the
+  voice's own seeded generator, as on the CZ. [Decided]
+- **Per line**: Level (dB), Octave (±3), Fifth (+7 semitones), Detune (±100 cents) and a pitch
+  envelope with its depth (±24 semitones). [Decided]
 - **Voices**: 8 in Poly, 1 in Mono with glide and legato. [Decided; batch 05 benchmark on the Intel
   Mac runner, checked again after the C++ port]
 
@@ -306,13 +310,21 @@ and a level, plus a sustain point and an end point, as on the CZ. [Decided]
 - **No XY pad.** [Decided]
 
 **Free modulators**: 2 LFOs and 2 mod envelopes per voice, on top of the four fixed envelopes.
-[Decided]
+[Decided; built in batch 09]
 
 - The mod envelopes are the same 8-stage kind.
-- Each modulator has **two destinations**, each with its own depth (±1). Any knob marked as a
-  destination in section 10 can be chosen. This replaces a separate mod matrix. [Decided]
+- Each modulator has **two destinations**, each with its own depth (±1). This replaces a separate
+  mod matrix. [Decided]
+- **Destinations** (each on both lines, line 1 or line 2): pitch, level, detune, Warp, Vector x,
+  Vector y, Sync ratio, Shape, Bias, Tilt, Odd/Even, Morph (drawn), Order Morph, Twist. Depth adds
+  to the knob's position (0–1, so the knob's own curve applies); pitch moves ±12 semitones at depth
+  1. A line playing line 1's settings (1+1′) follows line 1's modulation. [Decided]
 - **Mod wheel** and **aftertouch** each get one destination and depth too. [Decided]
-- LFO shapes: sine, triangle, saw, square, random. Rate is free or synced to tempo. [Decided]
+- LFO shapes: sine, triangle, saw, square, random (sample and hold). Rate 0.01–50 Hz free, or
+  synced to tempo: 1/32, 1/16, 1/8 triplet, 1/8, 1/4 triplet, 1/4, 1/2, 1, 2 or 4 bars. Each LFO
+  restarts on a new note unless Retrigger is off. [Decided]
+- **Rate.** The modulators run once per 32-sample block (1,500 times a second at 48 kHz); pitch
+  moves smoothly within the block. [Decided]
 
 ## 9. Band limiting
 
@@ -380,8 +392,9 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | | `mode` | Mono, Poly | Poly | Poly: 8 voices |
 | | `glide` | 0–2 s | 0 | Mono only. A straight line in pitch that arrives in this time |
 | Line | `octave` | −3 to +3 | 0 | |
+| | `fifth` | Off, On | Off | +7 semitones |
 | | `detune` | ±100 cents | 0 / +7 | M. Line 2 slightly off |
-| | `level` | −48 to 0 dB | 0 dB | M |
+| | `level` | −48 to +6 dB | 0 dB | M |
 | Warp | `wfamily` | CZ, Vector, Smooth, Sync | CZ | |
 | | `wave` | Saw … Resonance, Double pulse | Saw | CZ wave |
 | | `pair` | None, Saw … Double pulse | None | Alternating second wave |
@@ -411,9 +424,9 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | | `wenvdepth`, `senvdepth` | ±1 | +1, 0 | |
 | | `link` | −1 to +1 | 0 | Warp env also drives Shape |
 | | `velwarp`, `velshape`, `velamp` | 0–1 | 0.3, 0.3, 0.7 | Velocity depths |
-| Modulators | `lfo1`, `lfo2` | shape, rate, sync, 2 × (destination, depth) | Off | |
+| Modulators | `lfo1`, `lfo2` | shape, rate, sync, division, retrigger, 2 × (destination, depth) | Off | ids `lfo1shape`, `lfo1dest1`, `lfo1depth1` … |
 | | `menv1`, `menv2` | 8 stages, 2 × (destination, depth) | Off | |
-| | `wheel`, `aftertouch` | destination, depth | Off | |
+| | `wheel`, `aftertouch` | destination, depth | Off | ids `wheeldest`, `wheeldepth`, `atdest`, `atdepth` |
 | Pitch | `transpose` | ±24 st | 0 | |
 | | `bendrange` | 2–24 st | 2 | |
 | Output | `volume` | −48 to +6 dB | −6 dB | |
