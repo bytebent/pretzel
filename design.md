@@ -288,23 +288,50 @@ Both methods alias, and chaining them makes it worse. A warp with maximum slope 
 top frequency to f0·g′. A shaper of order N multiplies it by N. Folds, drawn kinks and Twist have
 no top at all.
 
-So Pretzel band-limits the whole chain, not each block on its own. [Decided]
+So Pretzel band-limits the whole chain, not each block on its own. [Decided; built in batch 04,
+numbers in `tests.md`]
 
+- **The CZ waves are smooth where they bend.** Every breakpoint of the CZ waves falls where the
+  cosine is flat (its top or bottom), so the wave has no jump and no kink there, only a change of
+  curvature. They need no corrections of their own.
+- **Pitch cap, the same for every wave.** The steepest part of a wave never reads the cosine
+  faster than 1/8 of the internal rate (24 kHz at 48 kHz): the chip's cap, which for the Saw is a
+  first segment of 4 samples. Double sine, which reads a whole cosine in its first segment, gets
+  twice the room.
+- **Chain-aware cap.** The shaper steepens the wave: a fold of gain G makes every frequency G times
+  higher, a saturator by d/f(d) near zero, a drawn curve by its steepest slope. The pitch cap and
+  the resonance ratio are divided by that factor, so a wave going into a hard fold is never steeper
+  than the fold can take. The resonance formant stays below 0.45 of the host rate and below 0.12 of
+  the internal rate divided by the factor.
 - **Chebyshev, exact.** Harmonic k's highest instantaneous frequency is k·f0·max g′, and max g′ is
-  known in closed form for every breakpoint warp. Each h_k fades out as that frequency nears 0.45
-  of the internal sample rate. Nothing aliases, and the fade sounds like a gentle filter. This rule
-  is the research pass's own derivation, not a published result. The bench must confirm it.
-- **Warp corners.** A polyBLAMP correction at each CZ breakpoint and polyBLEP at value jumps (the
-  square's sign flip, sync and VPS wraps). The Smooth family needs neither.
-- **Shaper.** First-order antiderivative antialiasing (ADAA: Parker, Zavalishin and Le Bivic,
-  DAFx-16) on Fold, Saturate and Drawn. Chebyshev and tanh have closed-form antiderivatives.
-  Drawn uses its stored tables.
+  known in closed form for every warp. Each harmonic fades out as that frequency goes from 0.3 to
+  0.45 of the internal rate. (Fading from 0.6 to 0.85, where folding would first reach the audio
+  band, left 10 dB more aliasing: the steep part of the wave spreads widely.)
+- **Shaper: first-order ADAA** (Parker, Zavalishin and Le Bivic, DAFx-16) on every family,
+  Chebyshev included: the shaped wave averaged over each sample, a box filter. Every family has a
+  closed-form antiderivative (Chebyshev through its coefficients, triangle fold piecewise
+  quadratic, sine fold in θ = asin x, saturators with log cosh and its kin) or a stored one (Analog
+  fold and Drawn, as tables). This adds half a sample of delay, the same at every Shape, so Shape 0
+  is the plain average of two samples (−0.5 dB at 20 kHz) and switching families never jumps.
+- **Jumps and kinks: split the sample.** Where the wave itself jumps or kinks (Resonance's hard
+  sync at the end of the cycle, Double pulse at p and ½ + p, the windows at ½ and the end), the
+  sample is split there and each piece is averaged on its own, so a jump goes through the shaper
+  as the jump it is, not as a line through the values between (which turned a jump into a spike
+  when the curve sends +1 and −1 to the same place). The shaped jump and kink then get
+  second-order residuals that turn the box into a triangle filter, as polyBLEP and polyBLAMP do.
+  This adds one more internal sample of delay. Splitting where the wave is smooth made things
+  worse (the steep peaks of a Pulse into Chebyshev aliased at −32 dB instead of −66), so only those
+  places split.
 - **Oversampling.** 4× with a windowed-sinc decimator, the same as Throat and Syrinx. An Eco mode
   at 2× comes only if performance is bad on the Mac. [Decided]
 - **Twist.** Each ADAA stage adds half a sample of delay, and inside the loop that changes the
   loop. So Twist relies on oversampling and its low-pass, not on ADAA.
-- **Bench test.** Measure alias energy (energy in bins that are not harmonics) from MIDI 24 to 108
-  for every warp × shaper × order. Pass: below −60 dB at the defaults.
+- **Result** (`tools/alias.js`: 10 waves × 7 shapers × Warp ½ and 1 × MIDI 24, 48, 72, 96, 108):
+  593 of 700 settings below −60 dB (303 before), the worst −38 dB (+21 before). Up to MIDI 72 the
+  only settings above −60 dB are the Triangle fold at full gain and Chebyshev on Double pulse or a
+  windowed Resonance. The hardest is the Triangle fold at gain 10 on the top notes: its own sharp
+  creases need more than first-order ADAA. Second-order ADAA or 8× for that fold is an option if
+  it is heard. [Open]
 
 ## 10. Parameters
 
@@ -398,7 +425,7 @@ line, for anyone who wants the numbers. [Decided]
 Same rules as Throat and Syrinx. [Decided]
 
 - Everything runs at 4× the host rate in fixed 32-sample blocks. The block is the latency,
-  reported to the host.
+  reported to the host. Band limiting adds 1.5 internal samples (under 8 µs at 48 kHz).
 - `process()` never allocates. Parameters are read once per block; envelopes and Twist are
   sample-accurate.
 - Each voice has its own seeded xorshift generator, used by Noise and the random LFO. Same seed and

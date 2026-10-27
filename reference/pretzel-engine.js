@@ -57,9 +57,18 @@
   const TWO_PI = 2 * Math.PI;
   const LEVEL = 0.35;           // one voice at full amp envelope
   const PIVOT_OCT = 7;          // Warp 1 puts the pivot 7 octaves below the middle (1/256 of a cycle)
-  const PIVOT_MIN_SAMPLES = 4;  // the chip's pitch cap: first segment at least this many internal samples
+  const WARP_FMAX = 1 / 8;      // the chip's pitch cap, made the same for every wave: the steepest part of
+                                // a wave never reads the cosine faster than 1/8 of the internal rate
+                                // (24 kHz at 48 kHz; for the Saw, a first segment of at least 4 samples)
+  const CHEB_LO = 0.3, CHEB_HI = 0.45;   // Chebyshev band limit: harmonic k fades out as k × the wave's
+                                // fastest frequency goes from 0.3 to 0.45 of the internal rate
+                                // (0.6–0.85 left 10 dB more aliasing: the steep part spreads widely)
+  const ADAA_EPS = 1e-6;        // below this input step, ADAA takes the shaper at the midpoint
   const RESO_MAX = 17;          // resonance ratio at Warp 1 (the chip reaches about 17)
   const RESO_NYQ = 0.45;        // resonance formant kept below this share of the host rate
+  const RESO_OS = 0.12;         // … and, after the shaper's steepening, below this share of the internal rate
+                                // (0.35 let a folded formant alias at −12 dB at MIDI 96; 0.12 equals the host
+                                // limit when nothing steepens it)
   const LEVEL_POW = 0.7;        // loudness evened by the wave's RMS to this power, as in Throat
   const LEVEL_MAX = 4;          // at most +12 dB of evening out
   const LEVEL_PTS = 16;         // points per piece of the cycle used to measure the wave's level
@@ -124,6 +133,9 @@
   function waveSample(w, win, ph, p, k) {
     return 2 * carrier(warpU(w, ph, p, k)) * windowW(win, ph) - 1;
   }
+  // the warp's steepest slope, g′, is SLOPE[w]/p (Resonance: k; Saw-pulse at least 1)
+  const SLOPE = [0.5, 0.5, 0.5, 1, 0.5, 0, 0.5];
+  function maxSlope(w, p, k) { return w === 5 ? k : Math.max(SLOPE[w] / p, 1); }
   // Warp amount (0–1) → pivot, and → resonance ratio
   function pivotOf(a, cap) { return Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), cap); }
   function resoOf(a, kmax) { return Math.min(Math.pow(RESO_MAX, a), kmax); }
@@ -164,10 +176,42 @@
     for (let i = 0; i < 4; i++) u = lockhart(u);
     return 3 * u;
   }
+  // the Analog folder as a table over −ANA_Z … ANA_Z, with its antiderivative: exact enough (checked in
+  // the tests), much faster than four Lambert W per sample, and it gives ADAA its antiderivative
+  const ANA_Z = 11, ANA_N = 1 << 14, ANA_H = 2 * ANA_Z / ANA_N;
+  const ANA = new Float64Array(ANA_N + 1), ANA_F = new Float64Array(ANA_N + 1);
+  for (let i = 0; i <= ANA_N; i++) ANA[i] = analogFold(-ANA_Z + i * ANA_H);
+  for (let i = 1; i <= ANA_N; i++) ANA_F[i] = ANA_F[i - 1] + 0.5 * ANA_H * (ANA[i - 1] + ANA[i]);
+  function anaAt(z) {
+    const x = (clamp(z, -ANA_Z, ANA_Z) + ANA_Z) / ANA_H, i = Math.min(ANA_N - 1, Math.floor(x)), f = x - i;
+    return ANA[i] + (ANA[i + 1] - ANA[i]) * f;
+  }
+  function anaF(z) {
+    const x = (clamp(z, -ANA_Z, ANA_Z) + ANA_Z) / ANA_H, i = Math.min(ANA_N - 1, Math.floor(x)), f = x - i;
+    return ANA_F[i] + ANA_H * f * (ANA[i] + 0.5 * (ANA[i + 1] - ANA[i]) * f);
+  }
+  const analogTab = { anaAt, anaF, ANA_Z };
   function triFold(v) {
     let t = (v + 1) * 0.25;
     t -= Math.floor(t);
     return 1 - 4 * Math.abs(t - 0.5);
+  }
+  // antiderivative of the triangle fold: periodic (period 4), piecewise quadratic
+  function triFoldF(z) {
+    let t = (z + 1) * 0.25;
+    t = (t - Math.floor(t)) * 4 - 1;        // −1 … 3
+    return t <= 1 ? 0.5 * t * t : 2 * t - 0.5 * t * t - 1;
+  }
+  // antiderivatives of the saturation curves (log cosh written so it cannot overflow)
+  function satCurveF(t, u) {
+    const a = Math.abs(u);
+    switch (t) {
+      // log cosh u: for small u as log1p(2·sinh²(u/2)), which keeps its precision near 0 (the other form
+      // lost it there and a Shape envelope closing to 0 crackled at −58 dB); for large u without overflow
+      case 0: { if (a < 20) { const h = Math.sinh(0.5 * a); return Math.log1p(2 * h * h); } return a + Math.log1p(Math.exp(-2 * a)) - Math.LN2; }
+      case 1: return u * Math.atan(u) - 0.5 * Math.log1p(u * u);
+      default: return a >= 1 ? (2 / 3) * a - 0.25 : 0.5 * u * u - u * u * u * u / 12;
+    }
   }
   // tanh, arctan and cubic soft clip, each scaled so f(d·x)/f(d) has a peak of 1
   function satCurve(t, u) {
@@ -220,7 +264,10 @@
   // one line's shaper settings for a block. e: Chebyshev weights at Shape 1 (after Tilt, Odd/Even);
   // c: scratch for the weights at the current Shape; dy, dF: the morphed drawn curve and its F1.
   function makeShaper() {
-    return { fam: 0, sub: 0, bias: 0, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1) };
+    return {
+      fam: 0, sub: 0, bias: 0, fpk: 0, dmax: 1, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), d: new Float64Array(NH + 3),
+      dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1),
+    };
   }
   // the shaped value of x (−1 … 1) at Shape s
   function shapeSample(sh, x, s) {
@@ -229,13 +276,7 @@
     const v = b === 0 ? x : (x + b) / (1 + Math.abs(b));
     switch (sh.fam) {
       case 0: {                         // Chebyshev, by Clenshaw's recurrence
-        // harmonic k comes in as Shape^(1 + (k−2)/4), like a waveshaping index (harmonic 2 first and
-        // linearly, higher ones later); the fundamental moves in a straight line from 1 to its
-        // slider. Every exponent is at least 1, so the weights still add up to at most 1.
-        const e = sh.e, c = sh.c, r = Math.sqrt(Math.sqrt(s));
-        let rk = s / r;
-        for (let k = 2; k <= NH; k++) { rk *= r; c[k] = e[k] * rk; }
-        c[1] = 1 - s + s * e[1];
+        const c = chebNow(sh, s);
         let b1 = 0, b2 = 0;
         for (let k = NH; k >= 1; k--) { const t = c[k] + 2 * v * b1 - b2; b2 = b1; b1 = t; }
         return v * b1 - b2;
@@ -245,7 +286,7 @@
         if (sh.sub === 0) return triFold(g * v);
         if (sh.sub === 1) return Math.sin(g * Math.asin(clamp(v, -1, 1)));
         // the Lockhart stages bend slightly even at gain 1; adding back that bend keeps Shape 0 exact
-        return analogFold(g * v) - analogFold(v) + v;
+        return anaAt(g * v) - anaAt(v) + v;
       }
       case 2: {                         // Saturate
         const d = SAT_MAX * s * s;
@@ -255,6 +296,99 @@
       default:                          // Drawn: Shape fades the curve in
         return v + s * (tableAt(sh.dy, v) - v);
     }
+  }
+  // the Chebyshev weights at Shape s, into sh.c. Harmonic k comes in as Shape^(1 + (k−2)/4), like a
+  // waveshaping index (harmonic 2 first and linearly, higher ones later); the fundamental moves in a
+  // straight line from 1 to its slider. Every exponent is at least 1, so the weights add up to at
+  // most 1. Band limit: harmonic k reads the warped cosine k times as fast, so its fastest frequency
+  // is k × the wave's (sh.fpk, a share of the internal rate); it fades out between CHEB_LO and CHEB_HI.
+  function chebNow(sh, s) {
+    const e = sh.e, c = sh.c, r = Math.sqrt(Math.sqrt(s)), f = sh.fpk;
+    let rk = s / r;
+    for (let k = 2; k <= NH; k++) {
+      rk *= r;
+      const fk = k * f;
+      c[k] = fk <= CHEB_LO ? e[k] * rk : fk >= CHEB_HI ? 0 : e[k] * rk * (CHEB_HI - fk) / (CHEB_HI - CHEB_LO);
+    }
+    c[1] = 1 - s + s * e[1];
+    return c;
+  }
+  // antiderivative of Σ c_k·T_k as Chebyshev coefficients d_0 … d_(NH+1):
+  // ∫T_1 = (T_0 + T_2)/4, ∫T_n = (T_(n+1)/(n+1) − T_(n−1)/(n−1))/2
+  function chebAntiCoeffs(c, d) {
+    d.fill(0);
+    d[0] += c[1] / 4; d[2] += c[1] / 4;
+    for (let n = 2; n <= NH; n++) { d[n + 1] += c[n] / (2 * (n + 1)); d[n - 1] -= c[n] / (2 * (n - 1)); }
+    return d;
+  }
+  function clenshaw0(d, n, v) {        // Σ_(m = 0…n) d_m·T_m(v)
+    let b1 = 0, b2 = 0;
+    for (let m = n; m >= 1; m--) { const t = d[m] + 2 * v * b1 - b2; b2 = b1; b1 = t; }
+    return d[0] + v * b1 - b2;
+  }
+  // the shaper's antiderivative F(v), in the shaper's own input v (after Bias), at Shape s. For
+  // Chebyshev, chebAntiCoeffs must have filled sh.d for this s.
+  function shapeAnti(sh, v, s) {
+    switch (sh.fam) {
+      case 0: return clenshaw0(sh.d, NH + 1, v);
+      case 1: {
+        const g = Math.pow(FOLD_MAX, s);
+        if (sh.sub === 0) return triFoldF(g * v) / g;
+        if (sh.sub === 1) {
+          // ∫ sin(g·asin v) dv = −cos((g+1)θ)/(2(g+1)) − cos((g−1)θ)/(2(g−1)), θ = asin v; the second term
+          // is written as sin²((g−1)θ/2)/(g−1) (same slope), which stays exact as g → 1
+          const th = Math.asin(clamp(v, -1, 1)), ep = g - 1, sn = Math.sin(0.5 * ep * th);
+          return -Math.cos((g + 1) * th) / (2 * (g + 1)) + (ep === 0 ? 0 : sn * sn / ep);
+        }
+        return anaF(g * v) / g - anaF(v) + 0.5 * v * v;
+      }
+      case 2: {
+        const d = SAT_MAX * s * s;
+        if (d < 1e-6) return 0.5 * v * v;
+        return satCurveF(sh.sub, d * v) / (d * satCurve(sh.sub, d));
+      }
+      default: return 0.5 * (1 - s) * v * v + s * antiAt(sh.dy, sh.dF, v);
+    }
+  }
+  // first-order antiderivative antialiasing (Parker, Zavalishin & Le Bivic 2016) between the last two
+  // inputs x0 → x1: the shaper averaged over the straight line between them. Shape 0 and Bias 0 give
+  // the plain average, the same half-sample delay as every shaper.
+  function shapeADAA(sh, x0, x1, s) {
+    const b = sh.bias;
+    if (s === 0 && b === 0) return 0.5 * (x0 + x1);
+    const k = b === 0 ? 1 : 1 / (1 + Math.abs(b));
+    const v0 = (x0 + b) * k, v1 = (x1 + b) * k, dv = v1 - v0;
+    if (Math.abs(dv) < ADAA_EPS) return shapeSample(sh, 0.5 * (x0 + x1), s);
+    if (sh.fam === 0) chebAntiCoeffs(chebNow(sh, s), sh.d);
+    return (shapeAnti(sh, v1, s) - shapeAnti(sh, v0, s)) / dv;
+  }
+  // how much the shaper steepens the wave at Shape s (its largest slope): a fold of gain g makes every
+  // frequency g times higher, a saturator d/f(d) times near zero. The warp's pitch cap and the
+  // resonance ratio are divided by it, so a wave going into a hard fold is never steeper than the
+  // fold can take. Chebyshev has its own band limit (the harmonic fade) and counts as 1.
+  function expansion(sh, s) {
+    switch (sh.fam) {
+      case 1: return Math.pow(FOLD_MAX, s);
+      case 2: { const d = SAT_MAX * s * s; return d < 1e-6 ? 1 : d * (sh.sub === 2 ? 1.5 : 1 / satCurve(sh.sub, d)); }
+      case 3: return Math.max(1, 1 - s + s * sh.dmax);
+    }
+    return 1;
+  }
+  // Residuals that turn a box-filtered jump or kink into a triangle-filtered one (second order, like
+  // polyBLEP and polyBLAMP), for a breakpoint a share τ into the sample: on the sample before (m),
+  // this sample (o) and the next (p). The box and the triangle are both centred half a sample back,
+  // where ADAA puts its output.
+  const res = { m: 0, o: 0, p: 0 };
+  function phi2(u) { return u <= -1 ? 0 : u <= 0 ? 0.5 * (1 + u) * (1 + u) : u < 1 ? 1 - 0.5 * (1 - u) * (1 - u) : 1; }
+  function q2(u) { return u <= -1 ? 0 : u <= 0 ? (1 + u) * (1 + u) * (1 + u) / 6 : u < 1 ? u + (1 - u) * (1 - u) * (1 - u) / 6 : u; }
+  function residuals(t, J, S) {
+    // jump J: box gives clamp(m − ts, 0, 1), triangle phi2(m − ½ − ts); ts = t − 1 for this sample
+    // kink S (change of slope per sample): box gives the ramp's box average, triangle q2
+    const a = 1 - t;
+    res.m = J * phi2(-0.5 - t) + S * q2(-0.5 - t);
+    res.o = J * (phi2(0.5 - t) - a) + S * (q2(0.5 - t) - 0.5 * a * a);
+    res.p = J * (phi2(1.5 - t) - 1) + S * (q2(1.5 - t) - (1 + a - 0.5));
+    return res;
   }
   // Chebyshev weights at Shape 1: h_k × k^Tilt, and Odd/Even (> 0 cuts even harmonics, < 0 cuts
   // odd ones above the fundamental). Scaled so they add up to 1: the output never passes ±1
@@ -275,7 +409,12 @@
   function morphCurves(sh, keys, F, n, m) {
     const x = clamp(m, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(x)), f = x - i;
     const a = keys[i], b = keys[i + 1], Fa = F[i], Fb = F[i + 1];
-    for (let j = 0; j <= CURVE_N; j++) { sh.dy[j] = a[j] + (b[j] - a[j]) * f; sh.dF[j] = Fa[j] + (Fb[j] - Fa[j]) * f; }
+    let mx = 0;
+    for (let j = 0; j <= CURVE_N; j++) {
+      sh.dy[j] = a[j] + (b[j] - a[j]) * f; sh.dF[j] = Fa[j] + (Fb[j] - Fa[j]) * f;
+      if (j) mx = Math.max(mx, Math.abs(sh.dy[j] - sh.dy[j - 1]));
+    }
+    sh.dmax = mx * CURVE_N / 2;
   }
 
   // mean, RMS and peak (DC removed) of a line's wave over one cycle (both cycles of a wave pair).
@@ -312,6 +451,7 @@
 
   const core = {
     levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX,
+    maxSlope, SLOPE, WARP_FMAX, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
     SHAPERS, FOLDS, SATS, NH, CURVE_N, makeShaper, shapeSample, chebWeights, morphCurves, curveTable, antiderivative,
     tableAt, antiAt, lockhart, analogFold, lambertWexp, DEFAULT_CURVES,
   };
@@ -456,6 +596,11 @@
       this.wenv = new Env(eng, 'wenv1'); this.senv = new Env(eng, 'senv1'); this.aenv = new Env(eng, 'aenv1');
       this.sh = makeShaper();
       this.dcx = 0; this.dcy = 0; this.gain = 1;
+      this.x1 = 0;               // the wave one sample back
+      this.acc = 0; this.bps = new Float64Array(4);   // split samples: running sum, breakpoints
+      this.q0 = 0; this.carry = 0;                     // the sample waiting for its residuals, and the next one's
+      this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
+      this.wp = 0.5; this.wk = 1;                      // pivot and resonance ratio, from warpPoint()
       this.k = {};          // per-block settings, filled by settings()
     }
     // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
@@ -491,11 +636,16 @@
       k.va = (1 - P[PINDEX.velamp1] * vl) * LEVEL;
       k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
       k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
-      const cap = Math.min(0.5, PIVOT_MIN_SAMPLES * hz / e.srOS);
-      k.lnCap = Math.log2(cap / 0.5);
-      k.kmaxLn = Math.log(Math.max(1, RESO_NYQ * e.sr / hz)); k.lnReso = Math.log(RESO_MAX);
       const pr = Math.round(P[PINDEX.pair1]);
       k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);
+      // pitch cap: the steepest slope SLOPE/p never reads the cosine faster than WARP_FMAX
+      k.cap = Math.max(SLOPE[k.w0], SLOPE[k.w1]) * hz / (WARP_FMAX * e.srOS);
+      k.kHost = RESO_NYQ * e.sr / hz; k.kOS = RESO_OS * e.srOS / hz; k.lnReso = Math.log(RESO_MAX);
+      k.fr = hz / e.srOS;                 // the note as a share of the internal rate
+      // where the wave can jump or kink (see render)
+      k.splitP = k.w0 === 6 || k.w1 === 6;
+      k.splitHalf = k.win >= 2;
+      k.splitEnd = k.win !== 0 || k.w0 === 5 || k.w1 === 5 || k.splitP;   // Double pulse at p = ½ jumps at the end
       // the shaper
       const sh = this.sh;
       sh.fam = Math.round(P[PINDEX.sfamily1]); sh.bias = P[PINDEX.bias1];
@@ -510,14 +660,42 @@
       }
       return k;
     }
+    // pivot and resonance ratio for Warp amount a and shaper steepening E, into this.wp, this.wk; and
+    // the wave's fastest frequency as a share of the internal rate (for the Chebyshev band limit)
+    warpPoint(a, E) {
+      const k = this.k;
+      this.wp = Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), Math.min(0.5, k.cap * E));
+      this.wk = Math.max(1, Math.min(Math.pow(RESO_MAX, a), k.kHost, k.kOS / E));
+      this.sh.fpk = k.fr * Math.max(maxSlope(k.w0, this.wp, this.wk), maxSlope(k.w1, this.wp, this.wk));
+    }
     warpAt(we) { const k = this.k, a = clamp(k.wbase + k.wdepth * we, 0, 1) * k.vw; return a; }
     shapeAt(we, se) { const k = this.k; return clamp(k.sbase + k.sdepth * se + k.link * we, 0, 1) * k.vs; }
     // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on,
     // and the level at the wave's own
     primeDc() {
-      const k = this.settings(), a = this.warpAt(0);
-      const l = levelOf(k.w0, k.w1, k.win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a, k.lnCap)), Math.exp(Math.min(a * k.lnReso, k.kmaxLn)), this.sh, this.shapeAt(0, 0));
+      const k = this.settings(), s0 = this.shapeAt(0, 0);
+      this.warpPoint(this.warpAt(0), expansion(this.sh, s0));
+      const p = this.wp, kr = this.wk;
+      const l = levelOf(k.w0, k.w1, k.win, p, kr, this.sh, s0);
       this.dcx = l.mean; this.dcy = 0; this.gain = levelGain(l);
+      // the band-limiting pipeline starts at the wave's first value, with nothing pending
+      this.x1 = waveSample(k.w0, k.win, 0, p, kr);
+      this.q0 = shapeSample(this.sh, this.x1, s0); this.carry = 0;
+    }
+    // one piece of a split sample: ADAA from xa to the wave just before phase b0 on wave wa, over a
+    // share dt of the sample; then the shaped jump and kink at the breakpoint (tb into the sample),
+    // whose residuals go to the last sample, this one and the next. Returns the wave just after
+    // phase b1 on wave wb (the next piece's start).
+    piece(xa, wa, b0, wb, b1, dt, tb, p, kr, s, inc) {
+      const win = this.k.win, sh = this.sh, e = 1e-12, d = 1e-3 * inc;
+      const xb = waveSample(wa, win, b0 - e, p, kr), xc = waveSample(wb, win, b1 + e, p, kr);
+      this.acc += dt * shapeADAA(sh, xa, xb, s);
+      const ya = shapeSample(sh, xb, s), yb = shapeSample(sh, xc, s);
+      const sa = (ya - shapeSample(sh, waveSample(wa, win, b0 - e - d, p, kr), s)) * 1e3;
+      const sb = (shapeSample(sh, waveSample(wb, win, b1 + e + d, p, kr), s) - yb) * 1e3;
+      const r = residuals(tb, yb - ya, sb - sa);
+      this.rm += r.m; this.ro += r.o; this.rp += r.p;
+      return xc;
     }
     render(n, out) {
       const e = this.eng;
@@ -525,30 +703,74 @@
       const dOct = this.targetOct - this.oct, step = this.glideStep * n;
       this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
       const k = this.settings(), sh = this.sh;
-      const { inc, vw, vs, va, wbase, wdepth, sbase, sdepth, link, lnCap, kmaxLn, lnReso, w0, w1, win } = k;
+      const { inc, vw, vs, va, wbase, wdepth, sbase, sdepth, link, w0, w1, win } = k;
       const R = e.dcR;
       // level: measured at the Warp and Shape the block starts with, moved to across the block
-      const a0 = this.warpAt(this.wenv.v);
-      const g1 = levelGain(levelOf(w0, w1, win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a0, lnCap)), Math.exp(Math.min(a0 * lnReso, kmaxLn)), sh, this.shapeAt(this.wenv.v, this.senv.v)));
+      const sb0 = this.shapeAt(this.wenv.v, this.senv.v);
+      this.warpPoint(this.warpAt(this.wenv.v), expansion(sh, sb0));
+      const g1 = levelGain(levelOf(w0, w1, win, this.wp, this.wk, sh, sb0));
       let g = this.gain;
       const dg = (g1 - g) / n;
-      let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy;
+      let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
       const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
       for (let i = 0; i < n; i++) {
         const we = wenv.next(), se = senv.next(), ae = aenv.next();
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
-        const p = 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a, lnCap));
-        const kr = Math.exp(Math.min(a * lnReso, kmaxLn));
         const s = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
-        const x = shapeSample(sh, 2 * carrier(warpU(odd ? w1 : w0, ph, p, kr)) * windowW(win, ph) - 1, s);
+        this.warpPoint(a, expansion(sh, s));
+        const p = this.wp, kr = this.wk;
+        // advance the phase; the new sample x0 is the naive wave
+        const prev = ph, wPrev = odd ? w1 : w0;
+        ph += inc;
+        let wrapped = false;
+        if (ph >= 1) { ph -= 1; odd ^= 1; wrapped = true; }
+        const w = odd ? w1 : w0;
+        const x0 = 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
+        // band limit: the shaped wave averaged over the sample (first-order ADAA, a box filter). Where the
+        // wave jumps or kinks inside the sample, the sample is split there and each piece is averaged on
+        // its own, so a jump goes through the shaper as the jump it is, not as a line through the values
+        // between; the jump and kink then get second-order residuals. The CZ waves are smooth at their
+        // own breakpoints (the cosine is flat there), so only these split: Double pulse at p and ½ + p,
+        // Resonance at the end of the cycle (hard sync), and a window at ½ and at the end of the cycle.
+        // (Splitting where the wave is smooth made the steep peaks alias more: −32 instead of −66 dB.)
+        const B = this.bps;
+        B[0] = k.splitP ? p : 2; B[1] = k.splitHalf ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
+        const end = wrapped ? 1 : ph;
+        let split = wrapped && k.splitEnd;
+        for (let j = 0; j < 3; j++) if (B[j] < 1 && B[j] > prev && B[j] <= end) { split = true; break; }
+        let cur;
+        this.rm = 0; this.ro = 0; this.rp = 0;
+        if (!split) cur = shapeADAA(sh, x1, x0, s);
+        else {
+          this.acc = 0;
+          let xa = x1, tp = 0;
+          for (let j = 0; j < 3; j++) {
+            const b = B[j];
+            if (b < 1 && b > prev && b <= end) { const t = (b - prev) / inc; xa = this.piece(xa, wPrev, b, wPrev, b, t - tp, t, p, kr, s, inc); tp = t; }
+          }
+          if (wrapped) {
+            const t = (1 - prev) / inc;
+            if (k.splitEnd) { xa = this.piece(xa, wPrev, 1, w, 0, t - tp, t, p, kr, s, inc); tp = t; }
+            for (let j = 0; j < 3; j++) {
+              const b = B[j];
+              if (b < 1 && b <= ph) { const t = (1 - prev + b) / inc; xa = this.piece(xa, w, b, w, b, t - tp, t, p, kr, s, inc); tp = t; }
+            }
+          }
+          this.acc += (1 - tp) * shapeADAA(sh, xa, x0, s);
+          cur = this.acc;
+        }
+        x1 = x0;
+        // one more sample of delay, so a breakpoint can correct the sample before it: x is the last
+        // sample, finished now
+        const x = this.q0 + this.rm;
+        this.q0 = cur + this.carry + this.ro; this.carry = this.rp;
         const y = x - dcx + R * dcy; dcx = x; dcy = y;
         g += dg;
         out[i] += y * ae * ae * g * va;
-        ph += inc;
-        if (ph >= 1) { ph -= 1; odd ^= 1; }
       }
       this.gain = g1;
-      this.ph = ph; this.odd = odd; this.dcx = dcx; this.dcy = Math.abs(dcy) < 1e-20 ? 0 : dcy;
+      this.ph = ph; this.odd = odd; this.x1 = x1;
+      this.dcx = dcx; this.dcy = Math.abs(dcy) < 1e-20 ? 0 : dcy;
       if (aenv.done && (!this.held || aenv.v === 0)) { this.active = false; this.held = false; }
     }
   }

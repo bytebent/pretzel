@@ -1,0 +1,143 @@
+alias energy, dB below the harmonics (20 Hz – 20 kHz); notes 24, 48, 72, 96, 108
+none · Saw · Warp 0.5                  -89  -88  -88  -68  -65
+none · Saw · Warp 1                    -89  -85  -74  -68  -65
+none · Square · Warp 0.5               -89  -88  -88  -68  -65
+none · Square · Warp 1                 -89  -85  -74  -68  -65
+none · Pulse · Warp 0.5                -90  -90  -88  -62  -61
+none · Pulse · Warp 1                  -90  -70  -62  -61  -61
+none · Double sine · Warp 0.5          -89  -88  -85  -58  -54
+none · Double sine · Warp 1            -88  -75  -63  -57  -54
+none · Saw-pulse · Warp 0.5            -89  -89  -88  -69  -66
+none · Saw-pulse · Warp 1              -89  -85  -74  -68  -66
+none · Reso · Warp 0.5                 -88  -57  -51  -45  -42
+none · Reso · Warp 1                  -102  -90 -120  -19  -23
+none · Reso+Saw · Warp 0.5             -89  -88  -89  -84  -71
+none · Reso+Saw · Warp 1               -92  -90  -89  -67  -64
+none · Reso+Tri · Warp 0.5             -88  -88  -89  -87  -82
+none · Reso+Tri · Warp 1               -91  -89  -86  -73  -57
+none · Reso+Trap · Warp 0.5            -88  -88  -89  -85  -73
+none · Reso+Trap · Warp 1              -93  -90  -90  -66  -61
+none · Double pulse · Warp 0.5         -44  -31  -25  -16  -15
+none · Double pulse · Warp 1           -34  -19  -16  -16  -15
+Cheb · Saw · Warp 0.5                  -90  -87  -60  -32  -29
+Cheb · Saw · Warp 1                    -90  -46  -38  -32  -29
+Cheb · Square · Warp 0.5               -89  -88  -64  -36  -33
+Cheb · Square · Warp 1                 -89  -50  -42  -36  -33
+Cheb · Pulse · Warp 0.5                -90  -90  -71  -16  -16
+Cheb · Pulse · Warp 1                  -90  -20  -16  -16  -16
+Cheb · Double sine · Warp 0.5          -89  -89  -36  -27  -23
+Cheb · Double sine · Warp 1            -89  -39  -33  -27  -23
+Cheb · Saw-pulse · Warp 0.5            -89  -87  -59  -30  -27
+Cheb · Saw-pulse · Warp 1              -89  -44  -36  -30  -27
+Cheb · Reso · Warp 0.5                 -89  -70  -64  -57  -18
+Cheb · Reso · Warp 1                   -95  -90 -114   -5   -2
+Cheb · Reso+Saw · Warp 0.5             -89  -89  -86  -54  -27
+Cheb · Reso+Saw · Warp 1               -91  -89  -60  -24  -27
+Cheb · Reso+Tri · Warp 0.5             -89  -89  -84  -64  -25
+Cheb · Reso+Tri · Warp 1               -90  -59  -37  -23  -25
+Cheb · Reso+Trap · Warp 0.5            -89  -89  -88  -62  -18
+Cheb · Reso+Trap · Warp 1              -92  -72  -50  -12  -13
+Cheb · Double pulse · Warp 0.5         -38  -24  -16   -6   -5
+Cheb · Double pulse · Warp 1           -26   -9   -6   -6   -5
+Fold sine ½ · Saw · Warp 0.5           -89  -87  -71  -47  -44
+Fold sine ½ · Saw · Warp 1             -89  -64  -53  -47  -44
+Fold sine ½ · Square · Warp 0.5        -89  -85  -70  -46  -43
+Fold sine ½ · Square · Warp 1          -89  -63  -53  -46  -43
+Fold sine ½ · Pulse · Warp 0.5         -90  -78  -60  -37  -38
+Fold sine ½ · Pulse · Warp 1           -90  -42  -38  -38  -38
+Fold sine ½ · Double sine · Warp 0.5   -96  -78  -58  -30  -26
+Fold sine ½ · Double sine · Warp 1     -99  -56  -35  -29  -26
+Fold sine ½ · Saw-pulse · Warp 0.5     -90  -86  -70  -47  -44
+Fold sine ½ · Saw-pulse · Warp 1       -90  -64  -53  -47  -44
+Fold sine ½ · Reso · Warp 0.5          -90  -43  -37  -16  -10
+Fold sine ½ · Reso · Warp 1            -92  -68  -31   -5    5
+Fold sine ½ · Reso+Saw · Warp 0.5      -90  -87  -73  -56  -42
+Fold sine ½ · Reso+Saw · Warp 1        -90  -74  -55  -37  -38
+Fold sine ½ · Reso+Tri · Warp 0.5      -92  -87  -73  -56  -44
+Fold sine ½ · Reso+Tri · Warp 1        -91  -73  -55  -38  -36
+Fold sine ½ · Reso+Trap · Warp 0.5     -91  -85  -70  -50  -37
+Fold sine ½ · Reso+Trap · Warp 1       -91  -69  -48  -31  -29
+Fold sine ½ · Double pulse · Warp 0.5   -45  -32  -24  -15  -14
+Fold sine ½ · Double pulse · Warp 1    -34  -18  -15  -15  -14
+Fold tri 1 · Saw · Warp 0.5            -89  -54  -40  -22  -12
+Fold tri 1 · Saw · Warp 1              -89  -34  -28  -22  -12
+Fold tri 1 · Square · Warp 0.5         -87  -38  -14   11   13
+Fold tri 1 · Square · Warp 1           -66    6   11   11   13
+Fold tri 1 · Pulse · Warp 0.5          -87  -39  -16   10   11
+Fold tri 1 · Pulse · Warp 1            -62    2   10   10   11
+Fold tri 1 · Double sine · Warp 0.5    -89  -46  -20  -20  -11
+Fold tri 1 · Double sine · Warp 1      -78  -36  -34  -22  -11
+Fold tri 1 · Saw-pulse · Warp 0.5      -90  -51  -37  -14   -7
+Fold tri 1 · Saw-pulse · Warp 1        -89  -31  -25  -14   -7
+Fold tri 1 · Reso · Warp 0.5           -91  -45  -32  -11   -8
+Fold tri 1 · Reso · Warp 1             -85  -29  -11   17   21
+Fold tri 1 · Reso+Saw · Warp 0.5       -90  -59  -40  -24   -1
+Fold tri 1 · Reso+Saw · Warp 1         -89  -40  -21   -2   17
+Fold tri 1 · Reso+Tri · Warp 0.5       -90  -59  -39  -19    3
+Fold tri 1 · Reso+Tri · Warp 1         -88  -40  -21    3    4
+Fold tri 1 · Reso+Trap · Warp 0.5      -90  -55  -36  -14    1
+Fold tri 1 · Reso+Trap · Warp 1        -87  -35  -17    8    6
+Fold tri 1 · Double pulse · Warp 0.5   -87  -39  -15   12   11
+Fold tri 1 · Double pulse · Warp 1     -66    6   11   12   11
+Fold analog ½ · Saw · Warp 0.5         -89  -91  -68  -40  -37
+Fold analog ½ · Saw · Warp 1           -89  -52  -45  -39  -37
+Fold analog ½ · Square · Warp 0.5      -89  -88  -67  -39  -36
+Fold analog ½ · Square · Warp 1        -89  -51  -44  -38  -36
+Fold analog ½ · Pulse · Warp 0.5       -90  -87  -58  -30  -29
+Fold analog ½ · Pulse · Warp 1         -90  -31  -28  -28  -29
+Fold analog ½ · Double sine · Warp 0.5   -93  -74  -46  -27  -23
+Fold analog ½ · Double sine · Warp 1   -95  -39  -33  -27  -23
+Fold analog ½ · Saw-pulse · Warp 0.5   -90  -89  -68  -40  -36
+Fold analog ½ · Saw-pulse · Warp 1     -90  -52  -45  -39  -36
+Fold analog ½ · Reso · Warp 0.5        -90  -47  -40  -24  -17
+Fold analog ½ · Reso · Warp 1          -92  -71  -31  -17   -3
+Fold analog ½ · Reso+Saw · Warp 0.5    -90  -90  -82  -48  -29
+Fold analog ½ · Reso+Saw · Warp 1      -90  -80  -47  -26  -27
+Fold analog ½ · Reso+Tri · Warp 0.5    -92  -90  -84  -52  -31
+Fold analog ½ · Reso+Tri · Warp 1      -92  -80  -48  -28  -25
+Fold analog ½ · Reso+Trap · Warp 0.5   -90  -91  -76  -41  -26
+Fold analog ½ · Reso+Trap · Warp 1     -91  -73  -40  -27  -26
+Fold analog ½ · Double pulse · Warp 0.5   -45  -32  -24  -14  -14
+Fold analog ½ · Double pulse · Warp 1   -34  -19  -15  -14  -14
+Tanh 0.7 · Saw · Warp 0.5              -89  -88  -72  -36  -33
+Tanh 0.7 · Saw · Warp 1                -89  -51  -42  -36  -33
+Tanh 0.7 · Square · Warp 0.5           -89  -88  -69  -33  -31
+Tanh 0.7 · Square · Warp 1             -89  -49  -40  -33  -31
+Tanh 0.7 · Pulse · Warp 0.5            -90  -90  -61  -25  -25
+Tanh 0.7 · Pulse · Warp 1              -90  -30  -25  -25  -25
+Tanh 0.7 · Double sine · Warp 0.5      -89  -88  -47  -36  -33
+Tanh 0.7 · Double sine · Warp 1        -89  -45  -42  -36  -33
+Tanh 0.7 · Saw-pulse · Warp 0.5        -89  -89  -71  -35  -32
+Tanh 0.7 · Saw-pulse · Warp 1          -89  -50  -41  -35  -32
+Tanh 0.7 · Reso · Warp 0.5             -88  -88  -89  -43  -27
+Tanh 0.7 · Reso · Warp 1               -98  -90  -43  -10   -8
+Tanh 0.7 · Reso+Saw · Warp 0.5         -90  -89  -89  -50  -31
+Tanh 0.7 · Reso+Saw · Warp 1           -91  -90  -49  -24  -25
+Tanh 0.7 · Reso+Tri · Warp 0.5         -89  -89  -89  -54  -31
+Tanh 0.7 · Reso+Tri · Warp 1           -90  -89  -48  -24  -25
+Tanh 0.7 · Reso+Trap · Warp 0.5        -89  -89  -89  -45  -28
+Tanh 0.7 · Reso+Trap · Warp 1          -92  -90  -45  -19  -20
+Tanh 0.7 · Double pulse · Warp 0.5     -46  -32  -26  -18  -18
+Tanh 0.7 · Double pulse · Warp 1       -35  -20  -19  -18  -18
+Drawn ½ · Saw · Warp 0.5               -89  -89  -86  -42  -38
+Drawn ½ · Saw · Warp 1                 -89  -51  -47  -41  -38
+Drawn ½ · Square · Warp 0.5            -90  -89  -87  -12  -10
+Drawn ½ · Square · Warp 1              -89  -15  -10  -11  -10
+Drawn ½ · Pulse · Warp 0.5             -91  -89  -88  -14  -12
+Drawn ½ · Pulse · Warp 1               -90  -17  -12  -12  -12
+Drawn ½ · Double sine · Warp 0.5       -92  -91  -56  -27  -23
+Drawn ½ · Double sine · Warp 1         -93  -37  -33  -27  -23
+Drawn ½ · Saw-pulse · Warp 0.5         -90  -90  -87  -39  -35
+Drawn ½ · Saw-pulse · Warp 1           -90  -48  -44  -38  -35
+Drawn ½ · Reso · Warp 0.5              -90  -53  -47  -34  -19
+Drawn ½ · Reso · Warp 1                -92  -89  -81  -12   -5
+Drawn ½ · Reso+Saw · Warp 0.5          -91  -90  -88  -88  -31
+Drawn ½ · Reso+Saw · Warp 1            -89  -89  -86  -27  -28
+Drawn ½ · Reso+Tri · Warp 0.5          -91  -90  -89  -89  -35
+Drawn ½ · Reso+Tri · Warp 1            -90  -88  -86  -29  -26
+Drawn ½ · Reso+Trap · Warp 0.5         -90  -89  -89  -86  -25
+Drawn ½ · Reso+Trap · Warp 1           -90  -89  -84  -26  -27
+Drawn ½ · Double pulse · Warp 0.5      -90  -89  -87  -12  -11
+Drawn ½ · Double pulse · Warp 1        -89  -15  -11  -11  -11
+
+worst: 20.5 dB  (Fold tri 1 · Reso · Warp 1 · MIDI 108)

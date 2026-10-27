@@ -4,7 +4,72 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 76 engine tests passing** (about 6 s). Renders: `node tools/render-presets.js`.
+**Now: 87 engine tests passing** (about 12 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute).
+
+## Batch 04 · band limiting
+
+`tools/alias.js` renders a steady note and measures the energy that is not a harmonic of it, from
+20 Hz to 20 kHz, against the harmonics. The matrix: 10 waves (Resonance alone and with each CZ
+window) × 7 shaper settings (none, Chebyshev 1/k at Shape 1, Sine fold ½, Triangle fold 1, Analog
+fold ½, Tanh 0.7, Drawn ½) × Warp ½ and 1 × MIDI 24, 48, 72, 96, 108: 700 settings. Full tables:
+`docs/tests/04-alias-before.txt` and `docs/tests/04-alias.txt`. The measuring floor is about −90 dB.
+
+| | below −60 dB | below −50 dB | median | worst |
+|---|---|---|---|---|
+| Batch 03 | 303 of 700 | 343 | −48 dB | **+21 dB** (Triangle fold on Resonance, MIDI 108) |
+| Batch 04 | 593 of 700 | 665 | −83 dB | **−38 dB** (Triangle fold on Double pulse, MIDI 108) |
+
+Below −60 dB per note, batch 03 → 04: MIDI 24 130 → 140 of 140, 48 82 → 134, 72 59 → 125, 96 19 → 107,
+108 13 → 87.
+
+![Up high, a run to MIDI 103 through the Sine fold, then hard-synced Resonance: before and after](docs/tests/04-up-high.png)
+
+What it took, in the order it was found:
+
+1. **The baseline** showed the plain CZ waves were already fine (−54 to −68 dB at MIDI 108): every
+   breakpoint falls where the cosine is flat, so there is no jump or kink, only a change of
+   curvature. Resonance without a window (hard sync, −19 dB) and Double pulse (jumps, −16 dB) were
+   bad; every shaper made things 10–40 dB worse at high notes.
+2. **polyBLEP and polyBLAMP on the wave, then ADAA on the shaper.** Plain Double pulse went from −16
+   to −55 dB, but a jumpy wave into a shaper got worse: Double pulse into Drawn ½ went from −89 to
+   −35 dB at MIDI 48. Smoothing a jump before the shaper sends the values between +1 and −1
+   through the curve, and Drawn ½ sends both +1 and −1 to 0, so the smoothed jump became a spike.
+3. **Split the sample at the breakpoint instead**, average each piece through the shaper, and put
+   the jump's residuals on the *shaped* jump. Drawn on Double pulse came back to −90 dB. The
+   residuals (box to triangle filter) gain 12–20 dB on jumps (Double pulse −41 → −53 dB at MIDI
+   108); checked against direct integration to 2e−8.
+4. **Split only where the wave really jumps or kinks.** Splitting at every breakpoint made the
+   steep peak of a Pulse into Chebyshev alias at −32 dB instead of −66 (the straight line from
+   each side up to the peak is a worse guess than one line across the sample).
+5. **The Chebyshev fade** at 0.6–0.85 of the internal rate (where folding first reaches the audio
+   band) left Chebyshev on a Saw at −49 dB at MIDI 96; at 0.3–0.45, as `design.md` first said, −60.
+   It costs harmonics only where the wave is steepest: on a fully warped low note harmonics above
+   about 3 fade.
+6. **The chain-aware pitch cap.** A square-like wave into the Triangle fold at gain 10 was at
+   +11 dB: the steep edge goes through ten folds in a few samples. The cap and the resonance ratio
+   are now divided by how much the shaper steepens the wave: −50 dB. The resonance formant
+   limit (0.12 of the internal rate after steepening) took the Sine fold on Resonance from −12 to
+   −55 dB at MIDI 96.
+7. **A crackle found by comparing renders.** The Shaper tour got a burst of noise at −58 dB above
+   10 kHz where its Shape envelope closed to 0 on Tanh: log cosh written as |u| + log1p(e^−2|u|) −
+   ln 2 loses all precision for tiny u, and ADAA divides that error by a tiny step. Now
+   log1p(2·sinh²(u/2)) for small u. A test checks every family at tiny Shapes. After the fix, no
+   render has more energy above 10 kHz than in batch 03 anywhere (largest +1 dB).
+
+Also tested: every shaper's antiderivative has the shaper as its slope (5.7e−8); the Analog
+folder, now a table, matches the Lambert W form to 1.5e−6 (and is much faster).
+
+**Still above −60 dB:** the Triangle fold at full gain on high notes (−38 to −50 dB; its own
+sharp creases need more than first-order ADAA), Chebyshev on Double pulse (−39 dB) and on a
+windowed Resonance at full Warp (−40 to −48 dB at MIDI 72–108). Second-order ADAA or 8× for the
+Triangle fold is the next step if it is heard.
+
+Cost: renders take 3–16% of real time on one core (up to 1.5× batch 03).
+
+Renders: all presets again (they change only by the band limiting, which is inaudible except at
+high notes: energy above 10 kHz within 1 dB of batch 03), plus **Up high**, a run to MIDI 103
+through the Sine fold and then hard-synced Resonance, also rendered with the batch 03 engine for
+comparison.
 
 ## Batch 03 · shaper
 

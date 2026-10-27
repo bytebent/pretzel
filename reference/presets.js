@@ -160,6 +160,19 @@
       sweeps: [{ id: 'tilt1', from: -1, to: 1, start: 0.3, end: 3.0 }, { id: 'tilt1', from: 1, to: 0, start: 3.0, end: 3.5 },
         { id: 'oddeven1', from: -1, to: 1, start: 3.6, end: 6.8 }],
     },
+
+    // ---------- batch 04: band limiting ----------
+    {
+      name: 'Up high',
+      about: 'A run up to MIDI 103, twice: a warped Saw into the Sine folder, then hard-synced Resonance (no window). Where aliasing used to be loudest; key follow off so nothing hides it.',
+      params: {
+        wave1: 0, warp1: 0.7, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.6, shapekey1: 0, velshape1: 0, velwarp1: 0,
+        mode: 0, glide: 0,
+        ...env('aenv', 1, [[0.005, 1], [0.2, 0.9], [0.05, 0]], 2, 3),
+      },
+      phrase: [...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, i * 0.3, 0.28]), ...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, 2.6 + i * 0.3, 0.28])],
+      steps: [{ time: 2.55, params: { wave1: 5, warp1: 0.85, sfamily1: 0, shape1: 0 } }],
+    },
   ];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };
