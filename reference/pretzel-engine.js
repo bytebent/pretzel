@@ -265,7 +265,7 @@
   // c: scratch for the weights at the current Shape; dy, dF: the morphed drawn curve and its F1.
   function makeShaper() {
     return {
-      ver: 0, lv: NaN, lf: 0, ls: 0, lver: -1, lp: 0, dS: NaN, dP: NaN, dV: -1, gS: NaN, g: 1,
+      nS: NaN, nSub: -1, n: 1, ver: 0, lv: NaN, lf: 0, ls: 0, lver: -1, lp: 0, dS: NaN, dP: NaN, dV: -1, gS: NaN, g: 1,
       fam: 0, sub: 0, bias: 0, fpk: 0, dmax: 1, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), d: new Float64Array(NH + 3),
       dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1),
     };
@@ -292,7 +292,7 @@
       case 2: {                         // Saturate
         const d = SAT_MAX * s * s;
         if (d < 1e-6) return v;
-        return satCurve(sh.sub, d * v) / satCurve(sh.sub, d);
+        return satCurve(sh.sub, d * v) / satNorm(sh, s, d);
       }
       default:                          // Drawn: Shape fades the curve in
         return v + s * (tableAt(sh.dy, v) - v);
@@ -346,7 +346,7 @@
       case 2: {
         const d = SAT_MAX * s * s;
         if (d < 1e-6) return 0.5 * v * v;
-        return satCurveF(sh.sub, d * v) / (d * satCurve(sh.sub, d));
+        return satCurveF(sh.sub, d * v) / (d * satNorm(sh, s, d));
       }
       default: return 0.5 * (1 - s) * v * v + s * antiAt(sh.dy, sh.dF, v);
     }
@@ -371,6 +371,11 @@
     sh.lv = v1; sh.lf = F1; sh.ls = s; sh.lver = sh.ver; sh.lp = sh.fpk;
     return (F1 - F0) / dv;
   }
+  // f(d), the saturator's value at full input, for drive d at Shape s (cached like the fold gain)
+  function satNorm(sh, s, d) {
+    if (s !== sh.nS || sh.sub !== sh.nSub) { sh.nS = s; sh.nSub = sh.sub; sh.n = satCurve(sh.sub, d); }
+    return sh.n;
+  }
   function foldGain(sh, s) {
     if (s !== sh.gS) { sh.gS = s; sh.g = Math.pow(FOLD_MAX, s); }
     return sh.g;
@@ -382,7 +387,7 @@
   function expansion(sh, s) {
     switch (sh.fam) {
       case 1: return foldGain(sh, s);
-      case 2: { const d = SAT_MAX * s * s; return d < 1e-6 ? 1 : d * (sh.sub === 2 ? 1.5 : 1 / satCurve(sh.sub, d)); }
+      case 2: { const d = SAT_MAX * s * s; return d < 1e-6 ? 1 : d * (sh.sub === 2 ? 1.5 : 1 / satNorm(sh, s, d)); }
       case 3: return Math.max(1, 1 - s + s * sh.dmax);
     }
     return 1;
