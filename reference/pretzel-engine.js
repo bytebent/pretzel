@@ -74,6 +74,10 @@
   const LEVEL_PTS = 16;         // points per piece of the cycle used to measure the wave's level
   const LEVEL_PEAK = 4;         // evening out never pushes a wave's peak past this (a cosine's is 1)
   const DC_HZ = 5;              // per-line DC blocker
+  const TWIST_MAX = 0.5;        // Twist 1 moves the read phase by up to half a cycle (±π, DX-style full feedback)
+  const TWIST_LP = 0.25;        // the loop's low-pass, as a share of the internal rate
+  const TWIST_LPA = 1 - Math.exp(-TWO_PI * TWIST_LP);
+  const TWIST_REF = 440;        // above this pitch, Twist's depth falls as √(440/f)
   const COS_N = 4096;           // cosine table size
 
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -546,8 +550,10 @@
     return ph < 0.5 ? th : 1 - th;
   }
   // a line's wave at phase φ, with the shaper first when pre.s > 0 (the window always follows time)
-  function waveAt(w, win, ph, p, k, pre) {
-    const u = pre && pre.s > 0 ? prePhase(pre.sh, ph, pre.s, pre.def) : ph;
+  // (rph: the phase the warp reads, when Twist moves it away from time; the window follows time)
+  function waveAt(w, win, ph, p, k, pre, rph) {
+    const r = rph === undefined ? ph : rph;
+    const u = pre && pre.s > 0 ? prePhase(pre.sh, r, pre.s, pre.def) : r;
     return 2 * carrier(warpU(w, u, p, k)) * windowW(win, ph) - 1;
   }
   // how much a shaper on the phase steepens it: as after the warp, except Chebyshev, which multiplies
@@ -651,6 +657,7 @@
     { id: 'ordermorph1', def: 0, min: 0, max: 1 },               // Morph: 0 Warp→Shape … 1 Shape→Warp
     { id: 'swmode1', def: 0, min: 0, max: 1, step: 1 },          // Shape→Warp: Read (A), Bend (B)
     { id: 'morphway1', def: 0, min: 0, max: 1, step: 1 },        // Morph: Through the warp, Shared
+    { id: 'twist1', def: 0, min: 0, max: 1 },                    // feedback of the shaped wave into its own phase
     { id: 'shapekey1', def: 0.3, min: 0, max: 1 },               // key follow: less shape above middle C
     { id: 'senvdepth1', def: 0, min: -1, max: 1 },
     { id: 'link1', def: 0, min: -1, max: 1 },                    // the Warp envelope also drives Shape
@@ -756,6 +763,7 @@
       this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
       this.wp = 0.5; this.wk = 1;                      // pivot and resonance ratio, from warpPoint()
       this.wo = { w: 0, p: 0.5, k: 1 };               // an out-of-bounds family's values
+      this.toff = 0; this.tp = 0; this.tlp = 0; this.E = 1;   // Twist's loop
       this.pre = { sh: this.sh, s: 0, def: 0 };       // the shaper on the phase (order), for waveAt
       this.sPost = 0;                                  // Shape after the warp, from orderSplit()
       this.k = {};          // per-block settings, filled by settings()
@@ -794,6 +802,11 @@
       k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
       k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
       k.order = Math.round(P[PINDEX.order1]); k.tm = P[PINDEX.ordermorph1];
+      // Twist depth in cycles, before the shaper's steepening divides it (in render)
+      // The last quarter of the knob deepens it up to 4 times: the steady range ends near ¾, and above
+      // it the loop breaks into controlled chaos (design.md §7)
+      const tw = P[PINDEX.twist1], over = Math.max(0, (tw - 0.75) / 0.25);
+      k.twist = tw * (1 + 3 * over * over) * TWIST_MAX * Math.min(1, Math.sqrt(TWIST_REF / hz));
       k.def = Math.round(P[PINDEX.swmode1]); k.way = Math.round(P[PINDEX.morphway1]);
       this.pre.def = k.def;
       const pr = Math.round(P[PINDEX.pair1]);
@@ -877,6 +890,8 @@
       // the band-limiting pipeline starts at the wave's first value, with nothing pending
       this.x1 = waveAt(k.w0, k.win, 0, p, kr, this.pre);
       this.q0 = shapeSample(this.sh, this.x1, this.sPost); this.carry = 0;
+      // Twist's loop starts empty
+      this.toff = 0; this.tp = this.q0; this.tlp = 0; this.E = 1;
     }
     // one piece of a split sample: ADAA from xa to the wave just before phase b0 on wave wa, over a
     // share dt of the sample; then the shaped jump and kink at the breakpoint (tb into the sample),
@@ -917,6 +932,8 @@
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy, x1 = this.x1;
       const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
       let wa = NaN, ws = NaN;
+      const twist = k.twist, twE = 1 + TWO_PI * Math.min(twist, TWIST_MAX);
+      if (!twist) this.toff = 0;
       for (let i = 0; i < n; i++) {
         const fri = fr0 + dfr * (i + 1), q = fri / fr1, inc = fri;
         k.fr = fri; k.cap = cap1 * q; k.kHost = kHost1 / q; k.kOS = kOS1 / q;
@@ -924,7 +941,8 @@
         const a = clamp(wbase + wdepth * we, 0, 1) * vw;
         const sAll = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
         // the pivot, resonance ratio and band limit only change when Warp, Shape or the pitch does
-        if (a !== wa || sAll !== ws || dfr !== 0) { this.warpPoint(a, this.orderSplit(sAll)); wa = a; ws = sAll; }
+        // (Twist speeds the read phase up by up to 1 + 2π·depth: the warp's cap counts that too)
+        if (a !== wa || sAll !== ws || dfr !== 0) { const E = this.orderSplit(sAll); this.E = E; this.warpPoint(a, E * twE); wa = a; ws = sAll; }
         const s = this.sPost;
         const p = this.wp, kr = this.wk;
         // advance the phase; the new sample x0 is the naive wave
@@ -933,7 +951,10 @@
         let wrapped = false;
         if (ph >= 1) { ph -= 1; odd ^= 1; wrapped = true; }
         const w = odd ? w1 : w0;
-        const x0 = pre.s > 0 ? waveAt(w, win, ph, p, kr, pre) : 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
+        // Twist: the warp reads the phase moved by the fed-back shaped wave
+        let x0;
+        if (twist) { const r = ph + this.toff; x0 = waveAt(w, win, ph, p, kr, pre, r - Math.floor(r)); }
+        else x0 = pre.s > 0 ? waveAt(w, win, ph, p, kr, pre) : 2 * carrier(warpU(w, ph, p, kr)) * windowW(win, ph) - 1;
         // band limit: the shaped wave averaged over the sample (first-order ADAA, a box filter). Where the
         // wave jumps or kinks inside the sample, the sample is split there and each piece is averaged on
         // its own, so a jump goes through the shaper as the jump it is, not as a line through the values
@@ -949,6 +970,9 @@
         const splitEnd = k.splitEnd || pre.s > 0;
         let split = wrapped && splitEnd;
         for (let j = 0; j < 3; j++) if (B[j] < 1 && B[j] > prev && B[j] <= end) { split = true; break; }
+        // with Twist the read phase can run backwards, so breakpoints are not where time puts them:
+        // no splitting; Twist relies on the oversampling and its own low-pass (design.md §7)
+        if (twist) split = false;
         let cur;
         this.rm = 0; this.ro = 0; this.rp = 0;
         if (!split) cur = shapeADAA(sh, x1, x0, s);
@@ -971,6 +995,19 @@
           cur = this.acc;
         }
         x1 = x0;
+        if (twist) {
+          // the loop: the shaped wave averaged over its last two samples (the DX7's anti-hunting
+          // filter), low-passed, soft-limited, scaled. Depth falls with the shaper's steepening and
+          // with pitch. No DC blocker in the loop: there is no integrator, so DC can only shift the
+          // phase by a fixed amount, never build up (the design had one; it adds nothing).
+          const t = cur;
+          const avg = 0.5 * (t + this.tp); this.tp = t;
+          this.tlp += TWIST_LPA * (avg - this.tlp);
+          // depth is divided by how much the warp and the shaper multiply a phase shift (a Resonance
+          // ratio of 17 turns a shift of the phase into 17 times that in the wave): Twist is then the
+          // same feedback index on every wave, instead of chaos at a quarter for steep ones
+          this.toff = twist / (this.E * Math.max(1, sh.fpk / k.fr)) * Math.tanh(this.tlp);
+        }
         // one more sample of delay, so a breakpoint can correct the sample before it: x is the last
         // sample, finished now
         const x = this.q0 + this.rm;

@@ -632,5 +632,51 @@ const cosine = (ph) => -Math.cos(2 * Math.PI * ph);     // what Warp 0 gives (2c
   check('24. the orders on a fully warped Saw up to MIDI 72: aliasing below −40 dB', w < -40, w.toFixed(1) + ' dB at worst (' + at + ')');
 }
 
+/* ================= batch 08: Twist ================= */
+
+/* ---------- 25. Twist ---------- */
+{
+  const { measure, renderSteady } = require(path.join(__dirname, '..', 'tools', 'alias.js'));
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const amp = (x, f) => { let re = 0, im = 0; const N = x.length; for (let i = 0; i < N; i++) { const w = 2 * Math.PI * f * i / SR, h = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N); re += x[i] * h * Math.cos(w); im += x[i] * h * Math.sin(w); } return Math.hypot(re, im); };
+  const f0 = 440 * Math.pow(2, (48 - 69) / 12);
+  // on a pure cosine, Twist does what DX feedback does: a saw-like spectrum, falling smoothly
+  const x = renderSteady({ twist1: 0.5 }, 48).subarray(0, 16384);
+  const h = [1, 2, 3, 4, 5, 6].map((k) => dB(amp(x, k * f0) / amp(x, f0)));
+  check('25. Twist ½ on a pure cosine: harmonics fall smoothly, as DX feedback makes a saw', h.every((v, i) => !i || v < h[i - 1]) && h[1] > -12, h.map((v) => v.toFixed(0)).join(' / ') + ' dB');
+  // the same feedback index on every wave: below full Twist the sound stays periodic
+  let w = -Infinity, at = '';
+  for (const [n, p] of [['Saw', { wave1: 0, warp1: 0.6 }], ['Reso + Triangle', { wave1: 5, window1: 2, warp1: 1 }], ['Vector', { wfamily1: 1, vecx1: 0.2, vecy1: 2.5, warp1: 1 }], ['Sine fold', { wave1: 0, warp1: 0.6, sfamily1: 1, fold1: 1, shape1: 0.5 }], ['Chebyshev', { wave1: 0, warp1: 0.6, sfamily1: 0, shape1: 1, h1_1: 1, h3_1: 0.5, h5_1: 0.3 }]])
+    for (const m of [48, 72]) { const v = measure({ ...p, twist1: 0.75 }, m); if (v > w) { w = v; at = n + ' MIDI ' + m; } }
+  check('25. Twist ¾ keeps every wave periodic (nothing between the harmonics above −55 dB)', w < -55, w.toFixed(1) + ' dB at worst (' + at + ')');
+  // no slow drift: nothing near the fundamental but the fundamental
+  // (measured against the same note without Twist, so the window's own leakage cancels out)
+  // Blackman-Harris window: its leakage 4 Hz away is below −90 dB (Hann's is −54 dB)
+  const ampBH = (x, f) => { let re = 0, im = 0; const N = x.length; for (let i = 0; i < N; i++) { const a = 2 * Math.PI * i / (N - 1), w = 2 * Math.PI * f * i / SR, h = 0.35875 - 0.48829 * Math.cos(a) + 0.14128 * Math.cos(2 * a) - 0.01168 * Math.cos(3 * a); re += x[i] * h * Math.cos(w); im += x[i] * h * Math.sin(w); } return Math.hypot(re, im); };
+  const sideOf = (t) => { const y = renderSteady({ wave1: 0, warp1: 0.6, twist1: t }, 48); let sd = 0; for (const d of [-9, -6, -4.5, 4.5, 6, 9]) sd = Math.max(sd, ampBH(y, f0 + d)); return dB(sd / ampBH(y, f0)); };
+  const s0 = sideOf(0), s5 = sideOf(0.5);
+  check('25. no slow drift of the phase: within 10 Hz of the fundamental, no more than without Twist', s5 < s0 + 3, s5.toFixed(0) + ' dB against ' + s0.toFixed(0) + ' dB without Twist');
+  // above ¾ the loop is deepened up to 4 times: at full Twist a pure cosine breaks up (controlled chaos)
+  const chaos = measure({ twist1: 1 }, 48), calm = measure({ twist1: 0.75 }, 48);
+  check('25. full Twist breaks a pure cosine up; at ¾ it is still periodic', chaos > -20 && calm < -80, 'between the harmonics ' + calm.toFixed(0) + ' dB at ¾, ' + chaos.toFixed(0) + ' dB at 1');
+  // in tune
+  const r = render(1.0, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.6, twist1: 0.75 }); e.noteOn(57, 100); }).L;
+  const fp = pitch(steady(r, 0.3, 0.9), SR, 180, 260);
+  check('25. Twist ¾ stays in tune', Math.abs(cents(fp, 220)) < 0.5, cents(fp, 220).toFixed(3) + ' cents');
+  // never runs away: full Twist on every shaper, order and pitch stays finite and below clipping
+  let pk = 0, bad = 0, pkAt = '';
+  for (const [sn, sp] of [['none', {}], ['Chebyshev', { sfamily1: 0, shape1: 1, h1_1: 1, h2_1: 0.5, h3_1: 0.7, h5_1: 0.4, h8_1: 0.3 }], ['Sine fold', { sfamily1: 1, fold1: 1, shape1: 1 }], ['Triangle fold', { sfamily1: 1, fold1: 0, shape1: 1 }], ['Analog fold', { sfamily1: 1, fold1: 2, shape1: 1 }], ['Tanh', { sfamily1: 2, shape1: 1 }], ['Drawn', { sfamily1: 3, shape1: 1, morph1: 0.6 }]])
+    for (const [on, op] of [['W→S', {}], ['S→W Read', { order1: 1 }], ['S→W Bend', { order1: 1, swmode1: 1 }]])
+      for (const m of [24, 60, 96, 108]) {
+        const L = render(0.4, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.8, twist1: 1, ...sp, ...op }); e.noteOn(m, 127); }).L;
+        for (const v of L) { if (!Number.isFinite(v)) bad++; if (Math.abs(v) > pk) { pk = Math.abs(v); pkAt = sn + ' ' + on + ' MIDI ' + m; } }
+      }
+  check('25. full Twist never runs away: 84 settings finite and unclipped', bad === 0 && pk < 0.99, 'peak ' + pk.toFixed(2) + ' (' + pkAt + ')');
+  // level holds
+  const lv = (t) => rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, wave1: 0, warp1: 0.6, sfamily1: 1, fold1: 1, shape1: 0.5, twist1: t }); e.noteOn(48, 100); }).L, 0.2, 0.5));
+  const l0 = lv(0), lt = [0.25, 0.5, 0.75, 1].map((t) => dB(lv(t) / l0));
+  check('25. level within 3 dB across Twist', lt.every((v) => Math.abs(v) < 3), lt.map((v) => v.toFixed(1)).join(' / ') + ' dB');
+}
+
 console.log('\n' + (count - failed) + ' of ' + count + ' tests passed');
 process.exit(failed ? 1 : 0);

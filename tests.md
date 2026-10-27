@@ -4,7 +4,42 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 106 engine tests passing** (about 30 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+**Now: 113 engine tests passing** (about 40 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 08 · Twist
+
+The shaped wave fed back into the phase the warp reads: a two-sample average (the DX7's), a
+low-pass, a tanh, a depth.
+
+- **On a pure cosine** Twist does what DX feedback does: by Twist ½ the harmonics fall like a saw's
+  (0, −7, −11, −14, −17, −19 dB for harmonics 1–6).
+- **First try: chaos at a quarter.** With one depth for every wave, steep waves broke up almost at
+  once: at Twist ¼, windowed Resonance had −4 dB of energy between its harmonics (subharmonics at
+  −25 to −31 dB), Vector −11, a Saw into the Sine fold −26. A shift of the read phase is multiplied
+  by the warp's steepness (a Resonance ratio of 17 makes it 17 times larger) and by the shaper's.
+  The depth is now divided by both: every wave stays periodic up to Twist ¾ (below −60 dB between
+  the harmonics in the test set), and Twist still moves every sound (brightness rises or falls by a
+  fifth to a half at Twist 1).
+- **Then no chaos at all.** With that scaling, full Twist barely broke anything up (−37 to −68 dB).
+  The last quarter of the knob now deepens the loop up to four times: at ¾ a pure cosine is still
+  periodic (−89 dB), at 1 it is noise (+3 dB).
+- **The DC blocker the design put in the loop was dropped.** I first blamed it for sidebands 5 Hz
+  either side of the fundamental; they were the analysis window's own leakage (numpy's Blackman
+  window leaks at −58 dB). With a Blackman-Harris window both versions show −99 dB there. The loop
+  has no integrator, so DC can't build up; the blocker added nothing.
+- **Stable:** full Twist on every shaper, three orders and MIDI 24, 60, 96 and 108 (84 settings)
+  stays finite and below clipping. Twist ¾ is in tune to 0.003 cents. Level within 0.1 dB across
+  the knob.
+- **Band limiting:** with Twist on, samples are not split at breakpoints (the read phase can run
+  backwards), and the pitch cap counts Twist's speed-up.
+- **Cost:** 8 voices with Twist 0.6 into the Sine fold, everything moving: 5.8% per voice here.
+- Presets 01–23 are bit-identical to batch 07 (Twist 0 changes nothing).
+
+![Spectrograms: Knot, Twist sweep, Twisted resonance, Knot to chaos](docs/tests/08-spectrograms.png)
+
+Renders: the design preset Knot, plus Twist sweep (a sine turning into a saw, then breaking up),
+Twisted resonance (with, then without Twist) and Knot to chaos. Twist is swept by the presets until
+the mod envelopes and LFOs arrive in batch 09.
 
 ## Batch 07 · order
 

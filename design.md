@@ -256,23 +256,32 @@ most) with Vector, Sync or windowed Resonance at MIDI 48 and up. Bend aliases le
 
 ## 7. Twist (feedback)
 
-Pretzel's second headline. The line's output, after the DC block, is fed back into its own phase,
-so the knot ties itself. [Decided]
+Pretzel's second headline. The line's shaped output is fed back into the phase the warp reads,
+so the knot ties itself. [Decided; built in batch 08]
 
 ```
-φ_eff[n] = φ[n] + β · softlimit( LP( ½(y[n−1] + y[n−2]) ) )
+read phase = φ + depth · tanh( LP( ½(y[n] + y[n−1]) ) )
+depth      = Twist · ½ cycle · min(1, √(440 Hz / f)) / (shaper steepening × warp steepening)
 ```
 
-- **Averaging the last two samples** is the DX7's "anti-hunting" filter (Ken Shirriff's
-  DX7 chip analysis; Yamaha's patents). It stops the loop from flipping between two states.
-- **LP** is a one-pole low-pass at about a quarter of the internal sample rate. **softlimit** is a
-  tanh.
-- **β** is scaled down by 1/(1 + N), where N is the shaper's effective order, and by pitch. This
-  means a bright shaper or a high note cannot explode the loop.
-- **The DC block sits before the tap**, so DC cannot build up as a fixed phase offset.
-- **What it sounds like**: low Twist turns a sine toward a saw, as DX feedback does. Mid Twist
-  adds a rough, formant-like growl through the shaper. Full Twist with Fold gives controlled
-  chaos. [Open: listening test]
+- **Averaging the last two samples** is the DX7's "anti-hunting" filter (Ken Shirriff's DX7 chip
+  analysis; Yamaha's patents). It stops the loop from flipping between two states.
+- **LP** is a one-pole low-pass at a quarter of the internal sample rate; **tanh** limits it, so
+  the phase never moves more than the depth.
+- **The same feedback index on every wave.** The depth is divided by how much the shaper and the
+  warp multiply a shift of the phase: a Resonance ratio of 17 turns a phase shift into 17 times
+  that in the wave. Without this, steep waves (windowed Resonance, Vector, folds) broke into chaos
+  at Twist ¼; with it, every wave stays periodic up to ¾. Depth also falls above 440 Hz.
+- **No DC blocker in the loop.** The design first had one before the tap. The loop has no
+  integrator, so DC can only shift the phase by a fixed amount; it never builds up.
+- **The last quarter of the knob** deepens the loop up to four times: steady up to ¾, then
+  controlled chaos at full Twist (a pure cosine breaks up into noise).
+- **What it sounds like**: low Twist turns a sine toward a saw, as DX feedback does (by Twist ½
+  the harmonics fall like a saw's). On shaped waves it adds a rough, vocal edge; the top quarter
+  breaks up. [Open: listening test]
+- **Band limiting.** The read phase can run backwards, so breakpoints are not where time puts them:
+  with Twist on, samples are not split. Twist relies on the 4× oversampling, the loop's low-pass
+  and ADAA on the output, and the warp's pitch cap counts Twist's speed-up (1 + 2π × depth).
 - The loop is one sample per voice and cannot be vectorised within a voice. Across voices it
   still can be.
 - **Moving Twist over time.** There is no Twist envelope of its own. Either mod envelope or LFO
@@ -470,7 +479,7 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 
 ## 14. Open
 
-1. Twist: what it sounds like across pitches and shapers (listening).
+1. Twist: what it sounds like across pitches and shapers, and where the chaos should start (listening).
 2. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
 3. How many voices the browser bench plays.
 4. Smoothing the creases of a fold on the phase (Shape → Warp), if they are heard.

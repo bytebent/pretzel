@@ -243,6 +243,46 @@
       phrase: [[43, 0, 6.2], [50, 0, 6.2]],
       sweeps: [{ id: 'ordermorph1', from: 0, to: 1, start: 0.3, end: 3.1 }, { id: 'ordermorph1', from: 1, to: 0, start: 3.1, end: 5.9 }],
     })),
+
+    // ---------- batch 08: Twist ----------
+    {
+      name: 'Knot',
+      design: true,
+      about: 'A warped Saw into the Sine fold with Twist 0.6: the shaped wave pulls its own phase. Twist has no envelope yet (mod envelopes and LFOs come in batch 09).',
+      params: {
+        wave1: 0, warp1: 0.5, wenvdepth1: 0.3, warpkey1: 0, sfamily1: 1, fold1: 1, shape1: 0.45, shapekey1: 0, velshape1: 0, twist1: 0.6,
+        ...env('wenv', 1, [[0.3, 1], [1.0, 0.4]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [1.2, 0.85], [0.3, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 1.4], [43, 1.5, 0.6], [41, 2.2, 0.6], [36, 2.9, 1.6]],
+    },
+    {
+      name: 'Twist sweep',
+      about: 'A pure cosine with Twist rising from 0 to 1 over five seconds: the DX feedback trick, a sine turning into a saw by about ½, then breaking up in the last quarter.',
+      params: { wave1: 0, warp1: 0, wenvdepth1: 0, twist1: 0, ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3) },
+      phrase: [[45, 0, 6.0]],
+      sweeps: [{ id: 'twist1', from: 0, to: 1, start: 0.3, end: 5.3 }],
+    },
+    {
+      name: 'Twisted resonance',
+      about: 'Resonance through the Triangle window, a slow Warp swell, Twist 0.5: the formant gets a rough, vocal edge. Then the same with Twist 0, for comparison.',
+      params: {
+        wave1: 5, window1: 2, warp1: 0.2, wenvdepth1: 0.7, warpkey1: 0, twist1: 0.5,
+        ...env('wenv', 1, [[1.2, 1], [0.8, 0.5]], 2, 3), ...env('aenv', 1, [[0.05, 1], [2, 0.9], [0.3, 0]], 2, 3),
+      },
+      phrase: [[38, 0, 2.4], [38, 2.8, 2.4]],
+      steps: [{ time: 2.75, params: { twist1: 0 } }],
+    },
+    {
+      name: 'Knot to chaos',
+      about: 'Square into the Analog fold, Shape → Warp (Bend), Twist swept from 0.4 to 1: steady up to ¾, then breaking into controlled chaos.',
+      params: {
+        wave1: 1, warp1: 0.4, wenvdepth1: 0, warpkey1: 0, sfamily1: 1, fold1: 2, shape1: 0.5, shapekey1: 0, order1: 1, swmode1: 1, twist1: 0.4,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 5.5]],
+      sweeps: [{ id: 'twist1', from: 0.4, to: 1, start: 0.5, end: 5.0 }],
+    },
   ];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };

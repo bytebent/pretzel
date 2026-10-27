@@ -35,6 +35,7 @@ const SCENARIOS = [
   ['8 voices, Fold Analog, everything moving', { wave1: 0, sfamily1: 1, fold1: 2 }, chord8, MOVE],
   ['8 voices, Shape → Warp A, Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, order1: 1, swmode1: 0 }, chord8, MOVE],
   ['8 voices, Morph shared (both shapers), Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, order1: 2, ordermorph1: 0.5, morphway1: 1 }, chord8, MOVE],
+  ['8 voices, Twist 0.6, Sine fold, moving', { wave1: 0, sfamily1: 1, fold1: 1, twist1: 0.6 }, chord8, MOVE],
   ['8 voices, Double pulse + window into Drawn, moving, high', { wave1: 6, pair1: 6, window1: 2, sfamily1: 3, keys1: 4 }, high8, MOVE],
 ];
 
