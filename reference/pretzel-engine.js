@@ -22,6 +22,10 @@
  *     of the knob, so brightness grows evenly. It is capped by pitch as the chip does, so the
  *     first segment never gets shorter than 4 internal samples.
  *   - 8-stage envelopes (time and level per stage, sustain point, end point) for Warp and Amp.
+ *     Amp gain is the envelope level squared (0.5 is −12 dB).
+ *   - Levels are evened out: every block the voice measures the RMS of its wave at the current
+ *     Warp and divides by it to the power 0.7, as in Throat, so a narrow pulse or a window does not
+ *     drop the level by up to 16 dB.
  *
  * Everything runs at 4x the host rate in fixed 32-sample blocks, then is decimated with a
  * 128-tap windowed-sinc FIR, as in Throat and Syrinx. process() never allocates. Same seed and
@@ -42,7 +46,10 @@
   const PIVOT_MIN_SAMPLES = 4;  // the chip's pitch cap: first segment at least this many internal samples
   const RESO_MAX = 17;          // resonance ratio at Warp 1 (the chip reaches about 17)
   const RESO_NYQ = 0.45;        // resonance formant kept below this share of the host rate
-  const AMP_DB = 72;            // amp envelope level 0–1 spans this many dB
+  const LEVEL_POW = 0.7;        // loudness evened by the wave's RMS to this power, as in Throat
+  const LEVEL_MAX = 4;          // at most +12 dB of evening out
+  const LEVEL_PTS = 16;         // points per piece of the cycle used to measure the wave's level
+  const LEVEL_PEAK = 4;         // evening out never pushes a wave's peak past this (a cosine's is 1)
   const DC_HZ = 5;              // per-line DC blocker
   const COS_N = 4096;           // cosine table size
 
@@ -107,7 +114,38 @@
   function pivotOf(a, cap) { return Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), cap); }
   function resoOf(a, kmax) { return Math.min(Math.pow(RESO_MAX, a), kmax); }
 
-  const core = { WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX };
+  // mean, RMS and peak (DC removed) of a line's wave over one cycle (both cycles of a wave pair).
+  // The cycle is cut at the warp's breakpoints and each piece gets the same number of points, so
+  // a narrow pulse is measured as well as a wide one.
+  const lvl = { mean: 0, rms: 1, peak: 1 };
+  const cuts = new Float64Array(8);
+  function levelOf(w0, w1, win, p, k) {
+    let nc = 0;
+    for (const c of [0, p, 2 * p, 0.5, 0.5 + p, 1]) if (c <= 1) cuts[nc++] = c;
+    cuts.subarray(0, nc).sort();
+    let m = 0, s = 0, hi = -Infinity, lo = Infinity;
+    const n = w1 === w0 ? 1 : 2;
+    for (let c = 0; c < n; c++) {
+      const w = c ? w1 : w0;
+      for (let j = 1; j < nc; j++) {
+        const a = cuts[j - 1], len = cuts[j] - a;
+        if (len <= 0) continue;
+        for (let i = 0; i < LEVEL_PTS; i++) {
+          const x = waveSample(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k);
+          m += x * len; s += x * x * len;
+          if (x > hi) hi = x; if (x < lo) lo = x;
+        }
+      }
+    }
+    m /= n * LEVEL_PTS; s /= n * LEVEL_PTS;
+    lvl.mean = m; lvl.rms = Math.sqrt(Math.max(s - m * m, 1e-12)); lvl.peak = Math.max(hi - m, m - lo, 1e-6);
+    return lvl;
+  }
+  // evening-out gain: RMS to the power 0.7, never more than +12 dB, and never pushing the peak
+  // past LEVEL_PEAK (a narrow pulse is spiky: matching its RMS would make it clip)
+  function levelGain(l) { return clamp(Math.min(Math.pow(Math.SQRT1_2 / l.rms, LEVEL_POW), LEVEL_PEAK / l.peak), 1 / LEVEL_MAX, LEVEL_MAX); }
+
+  const core = { levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX };
 
   /* ---------- parameters ---------- */
   // ids, defaults and ranges: the one table the C++ core and the UI copy.
@@ -230,7 +268,7 @@
       this.vel = 1; this.oct = 0; this.targetOct = 0; this.glideStep = 0;
       this.ph = 0; this.odd = 0;
       this.wenv = new Env(eng, 'wenv1'); this.aenv = new Env(eng, 'aenv1');
-      this.dcx = 0; this.dcy = 0;
+      this.dcx = 0; this.dcy = 0; this.gain = 1;
     }
     // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
     setTarget(note, glide) {
@@ -254,13 +292,12 @@
       this.wenv.release(); this.aenv.release();
       if (this.aenv.done && this.aenv.v > 0) this.aenv.fade(0.01);
     }
-    // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on
+    // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on,
+    // and the level at the wave's own
     primeDc() {
-      const e = this.eng, P = e.p, w = Math.round(P[PINDEX.wave1]), win = Math.round(P[PINDEX.window1]);
-      const s = this.shapeNow(0);
-      let m = 0;
-      for (let i = 0; i < 64; i++) m += waveSample(w, win, (i + 0.5) / 64, s.p, s.k);
-      this.dcx = m / 64; this.dcy = 0;
+      const P = this.eng.p, w0 = Math.round(P[PINDEX.wave1]), pr = Math.round(P[PINDEX.pair1]);
+      const s = this.shapeNow(0), l = levelOf(w0, pr > 0 ? pr - 1 : w0, Math.round(P[PINDEX.window1]), s.p, s.k);
+      this.dcx = l.mean; this.dcy = 0; this.gain = levelGain(l);
     }
     // pivot and resonance ratio for a Warp envelope value
     shapeNow(we) {
@@ -289,7 +326,12 @@
       const kmaxLn = Math.log(Math.max(1, RESO_NYQ * e.sr / hz)), lnReso = Math.log(RESO_MAX);
       const w0 = Math.round(P[PINDEX.wave1]), pr = Math.round(P[PINDEX.pair1]);
       const w1 = pr > 0 ? pr - 1 : w0, win = Math.round(P[PINDEX.window1]);
-      const R = e.dcR, kA = AMP_DB / 20 * Math.LN10;
+      const R = e.dcR;
+      // level: measured at the Warp the block starts with, moved to across the block
+      const a0 = clamp(base + depth * this.wenv.v, 0, 1) * vw;
+      const g1 = levelGain(levelOf(w0, w1, win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a0, lnCap)), Math.exp(Math.min(a0 * lnReso, kmaxLn))));
+      let g = this.gain;
+      const dg = (g1 - g) / n;
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy;
       const wenv = this.wenv, aenv = this.aenv;
       for (let i = 0; i < n; i++) {
@@ -299,11 +341,12 @@
         const k = Math.exp(Math.min(a * lnReso, kmaxLn));
         const x = 2 * carrier(warpU(odd ? w1 : w0, ph, p, k)) * windowW(win, ph) - 1;
         const y = x - dcx + R * dcy; dcx = x; dcy = y;
-        const amp = ae > 0 ? Math.exp((ae - 1) * kA) : 0;
-        out[i] += y * amp * va;
+        g += dg;
+        out[i] += y * ae * ae * g * va;
         ph += inc;
         if (ph >= 1) { ph -= 1; odd ^= 1; }
       }
+      this.gain = g1;
       this.ph = ph; this.odd = odd; this.dcx = dcx; this.dcy = Math.abs(dcy) < 1e-20 ? 0 : dcy;
       if (aenv.done && (!this.held || aenv.v === 0)) { this.active = false; this.held = false; }
     }

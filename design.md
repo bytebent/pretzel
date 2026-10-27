@@ -80,6 +80,9 @@ ring-modulated. [Decided: two lines, called lines]
 
 ## 4. Warp (phase distortion)
 
+**Warp is Pretzel's name for phase distortion**, the stage the CZ called DCW. Warp amount is the
+DCW amount.
+
 The phase φ runs from 0 to 1 once per cycle. The warp is a function g, and the carrier reads a
 cosine at g(φ). At Warp 0, g(φ) = φ and every warp is a pure cosine, as at DCW 0 on a CZ. The
 Warp amount is what the CZ called DCW.
@@ -250,6 +253,12 @@ and a level, plus a sustain point and an end point, as on the CZ. [Decided]
 - **Key follow** on Warp and Shape, as on the CZ's DCW. High notes get less warp and shape. This
   is both a musical choice and a band limit. [Decided]
 - **Velocity** to Amp, Warp and Shape, each with its own depth. [Decided]
+- **Amp level curve.** Amp gain is the envelope level squared: 0.5 is −12 dB. (A 72 dB log scale,
+  as on the CZ, made every sustain below 1 sound much too quiet: 0.7 was −22 dB.) [Decided, batch 02]
+- **Levels are evened out.** Every block, each line measures its wave's RMS at the current Warp
+  and divides by it to the power 0.7, as in Throat, up to +12 dB. Without it a narrow Pulse is
+  16 dB down and the windows take 3–11 dB off. Spiky waves stop at 4 times their peak, so a narrow
+  pulse at full Warp stays up to 12 dB down instead of clipping. [Decided, batch 02]
 - **No XY pad.** [Decided]
 
 **Free modulators**: 2 LFOs and 2 mod envelopes per voice, on top of the four fixed envelopes.

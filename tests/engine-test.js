@@ -207,10 +207,10 @@ function mameWindow(win, pos) {
   const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
   const a = rms(steady(L, 0.3, 0.5)), b = rms(steady(L, 0.7, 0.9));
   check('8. the amp envelope holds at its sustain stage', Math.abs(dB(b / a)) < 0.1, (dB(b / a)).toFixed(2) + ' dB drift');
-  // level 1 held for 0.3 s, then down to 0.5 and held: 36 dB lower on the 72 dB scale
+  // level 1 held for 0.3 s, then down to 0.5 and held
   const r1 = render(1.0, (e) => { apply(e, { ...PLAIN, ...env('aenv', 1, [[0.005, 1], [0.3, 1], [0.005, 0.5], [0.1, 0]], 3, 4) }); e.noteOn(60, 100); });
   const full = rms(steady(r1.L, 0.1, 0.3)), held = rms(steady(r1.L, 0.5, 0.9));
-  check('8. sustain level 0.5 sits 36 dB below level 1 (72 dB scale)', Math.abs(dB(held / full) + 36) < 0.5, dB(held / full).toFixed(2) + ' dB');
+  check('8. amp gain is the level squared: sustain 0.5 sits 12 dB below level 1', Math.abs(dB(held / full) + 12.04) < 0.2, dB(held / full).toFixed(2) + ' dB');
   check('8. after release the voice stops', e.info.voices === 0 && rms(steady(L, 1.4, 2.0)) < 1e-6);
   // no sustain point: the envelope runs to its end with the key held, and the voice stops
   const r2 = render(1.0, (e) => { apply(e, { ...PLAIN, ...env('aenv', 1, [[0.01, 1], [0.2, 0]], 0, 2) }); e.noteOn(60, 100); });
@@ -220,6 +220,27 @@ function mameWindow(win, pos) {
   const zc = (x) => { let c = 0; for (let i = 1; i < x.length; i++) if ((x[i - 1] < 0) !== (x[i] < 0)) c++; return c; };
   const diff = (x) => { let s = 0; for (let i = 1; i < x.length; i++) s += (x[i] - x[i - 1]) ** 2; return Math.sqrt(s) / rms(x) / Math.sqrt(x.length); };
   check('8. the Warp envelope opens the timbre and settles', diff(steady(r3.L, 0.18, 0.22)) > 1.5 * diff(steady(r3.L, 1.0, 1.4)), diff(steady(r3.L, 0.18, 0.22)).toFixed(3) + ' vs ' + diff(steady(r3.L, 1.0, 1.4)).toFixed(3));
+}
+
+/* ---------- 8b. levels are evened out ---------- */
+{
+  // every wave at five Warp settings, and Resonance through every window: the level stays near
+  // the Saw's. Without evening out the spread is 19 dB (Pulse at full Warp −16 dB, Square +3 dB,
+  // windows down to −11 dB).
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const level = (p) => dB(rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, warpkey1: 0, ...p }); e.noteOn(48, 100); }).L, 0.2, 0.5)));
+  const ref = level({ wave1: 0, warp1: 0 });
+  const rows = [];
+  for (let w = 0; w < 7; w++) for (const a of [0, 0.25, 0.5, 0.75, 1]) rows.push(['wave ' + w + ' Warp ' + a, level({ wave1: w, warp1: a }) - ref]);
+  for (let win = 1; win < 6; win++) for (const a of [0, 0.5, 1]) rows.push(['Resonance window ' + win + ' Warp ' + a, level({ wave1: 5, window1: win, warp1: a }) - ref]);
+  // Pulse and Double pulse become spikes at high Warp: matching their RMS would push the peak far
+  // past everything else, so their gain stops at 4 times their peak. They are checked apart.
+  const spiky = (r) => /^wave [26] Warp (0\.75|1)$/.test(r[0]);
+  const main = rows.filter(r => !spiky(r)), sp = rows.filter(spiky);
+  const lo = Math.min(...main.map(r => r[1])), hi = Math.max(...main.map(r => r[1]));
+  check('8b. levels across every wave, Warp and window within 3.5 dB of the Saw', lo > -3.5 && hi < 3.5, lo.toFixed(1) + ' to +' + hi.toFixed(1) + ' dB; lowest ' + main.find(r => r[1] === lo)[0]);
+  const slo = Math.min(...sp.map(r => r[1]));
+  check('8b. narrow pulses (Pulse, Double pulse at Warp 0.75 and 1) no more than 12 dB down', slo > -12, slo.toFixed(1) + ' dB at worst (16.3 dB down without evening out)');
 }
 
 /* ---------- 9. voices ---------- */

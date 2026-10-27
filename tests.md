@@ -4,7 +4,7 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 43 engine tests passing** (under 1 s). Renders: `node tools/render-presets.js`.
+**Now: 45 engine tests passing** (under 1 s). Renders: `node tools/render-presets.js`.
 
 ## Batch 02 · one line, CZ warp
 
@@ -32,10 +32,23 @@ antialiasing yet beyond that.
   carrier above zero). The line's DC blocker starts at the wave's mean, so notes start clean: without
   that, Resonance + Triangle window started with an offset of 11% of its peak, Pulse + Pulse window
   17%. Now under 1%.
+- **Levels** (after your first listen: about 8 dB between presets). Two causes, both fixed:
+  - *The amp envelope's 72 dB scale.* Every sustain below 1 dropped fast (0.7 was −22 dB). Amp gain
+    is now the level squared: 0.5 is −12 dB.
+  - *The wave's own shape.* A narrow Pulse is 16 dB below a Saw, Square 3 dB above, and the
+    windows take 3–11 dB off Resonance. Each line now measures its wave's RMS every block and
+    evens it out to the power 0.7, as in Throat. Every wave, Warp and window now sits within
+    −3.3 to +0.9 dB of the Saw. Pulse and Double pulse at high Warp are spikes: matching their RMS
+    pushed peaks to clipping (tried peak limits of 2.5, 4 and 8 times a cosine's peak; 8 clipped
+    the Wave tour). At 4 they stay at most 12 dB down.
+  - Measuring needed care: 64 even points per cycle missed a narrow pulse completely and boosted
+    it by the full +12 dB. The cycle is now cut at the warp's breakpoints, with 16 points per piece.
+  - Renders now: single-note presets −19.7 to −21.7 dB RMS. CZ Brass plays four-note chords, so
+    its Volume is 6 dB down to match.
 - **Same output at any buffer size** (128, 37 and 1 samples): bit for bit.
-- **Envelopes.** Sustain holds (0.02 dB drift), level 0.5 sits 36.0 dB below level 1, a release
+- **Envelopes.** Sustain holds (0.02 dB drift), level 0.5 sits 12.0 dB below level 1, a release
   jumps past the sustain point and the voice stops, an envelope with no sustain point runs to its
-  end with the key held. Amp levels are on a 72 dB scale.
+  end with the key held.
 - **Voices.** Poly holds 8. Mono glide changed from an exponential (which never quite arrived:
   7 cents short after 4.5 time constants) to a straight line in pitch that arrives in the Glide
   time, whatever the interval.

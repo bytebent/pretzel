@@ -19,9 +19,9 @@
     {
       name: 'CZ Brass',
       design: true,
-      about: 'Saw, the Warp envelope opens on each attack and settles. Shape 0: the CZ core alone.',
+      about: 'Saw, the Warp envelope opens on each attack and settles. Shape 0: the CZ core alone. Four-note chords, so Volume is 6 dB down to match the single-note presets.',
       params: {
-        wave1: 0, warp1: 0, velwarp1: 0.4,
+        wave1: 0, warp1: 0, velwarp1: 0.4, volume: -12,
         ...env('wenv', 1, [[0.07, 0.8], [0.5, 0.5], [0.25, 0]], 2, 3),
         ...env('aenv', 1, [[0.03, 1], [0.6, 0.85], [0.25, 0]], 2, 3),
       },
