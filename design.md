@@ -297,15 +297,15 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | | `ring` | Off, On | Off | Line 2 × line 1 |
 | | `noise` | Off, On | Off | Noise on line 2's pitch |
 | | `mode` | Mono, Poly | Poly | Poly: 8 voices |
-| | `glide` | 0–2 s | 0 | Mono only |
+| | `glide` | 0–2 s | 0 | Mono only. A straight line in pitch that arrives in this time |
 | Line | `octave` | −3 to +3 | 0 | |
 | | `detune` | ±100 cents | 0 / +7 | M. Line 2 slightly off |
 | | `level` | −48 to 0 dB | 0 dB | M |
 | Warp | `wfamily` | CZ, Vector, Smooth, Sync | CZ | |
 | | `wave` | Saw … Resonance, Double pulse | Saw | CZ wave |
-| | `wave2` | None, Saw … Double pulse | None | Alternating second wave |
+| | `pair` | None, Saw … Double pulse | None | Alternating second wave |
 | | `window` | None, Saw, Tri, Trap, Pulse, Double saw | None | On any wave |
-| | `warp` | 0–1 | 0.5 | M. DCW amount, before the envelope |
+| | `warp` | 0–1 | 0 | M. Warp amount; the Warp envelope adds to it |
 | | `vecx`, `vecy` | 0–1, 0–4 | 0.5, 1 | M. Vector point (d, v) |
 | | `curve` | Power, Sigmoid, Bezier | Sigmoid | Smooth curve type |
 | | `ratio` | 1–16 | 2 | M. Sync ratio |
