@@ -41,6 +41,12 @@ cosine): 8 voices of Shape → Warp A with Shape moving take 6.2% per voice here
 the benchmark's worst case: a full voice in JavaScript is projected at 21% per voice, 171% for 8.
 The C++ port decides whether that matters (batch 11).
 
+**More examples for choosing** (`node tools/render-compare.js` → `renders/compare/`): each file
+plays one phrase twice. Six A-then-B pairs (Chebyshev pluck bass, Tanh pad, Vector lead into the
+Sine fold, windowed Resonance into the Analog fold, Sync arpeggio into Drawn, and the Triangle fold
+sweep), and five Morph pairs, through the warp then shared (definition B, Morph sweeping 0 → 1 → 0).
+The two halves sit within 1.6 dB of each other; B came out brighter than A in five of the six.
+
 Renders: Inside Out (A) and (B), Turning (through the warp) and (shared), for choosing. Turning
 sweeps Morph with a programmed sweep until the LFOs arrive in batch 09.
 
