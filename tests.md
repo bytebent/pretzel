@@ -4,7 +4,39 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 87 engine tests passing** (about 12 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+**Now: 98 engine tests passing** (about 20 s). Renders: `node tools/render-presets.js`. Aliasing table: `node tools/alias.js` (about 1 minute). Benchmark: runs on GitHub's Intel Mac on every push (`.github/workflows/mac.yml`); results are on the run's summary.
+
+## Batch 06 · out-of-bounds warps
+
+Vector, Smooth (Power, Sigmoid, Bezier) and Sync, chosen by Family. In every family Warp 0 is a
+pure cosine and the knobs say where Warp 1 goes.
+
+![One cycle of each family at Warp ¼, ½, ¾ and 1](docs/tests/06-families.png)
+
+- **Warp 0 is a pure cosine** in every family whatever the knobs (other harmonics −146 dB); Vector
+  at (½, ½) and Sync at ratio 1 stay pure at Warp 1.
+- **A design slip found by the first test:** Vector's plain point is (½, ½), not (½, 1) as
+  `design.md` had it. (½, 1) reads a whole cycle by the middle of the period. Fixed in the design.
+- **Vector** moves its formant up with v (strongest harmonic 1, 2, 3 for v = 1.5, 2.5, 3.5 at
+  d = 0.2). **Sync 7** through the Triangle window peaks at harmonic 7.
+- **The pitch cap holds** for every family (steepest slope / cap ≤ 1.000). Two fixes on the way: the
+  Sigmoid's limit (c ≤ 2 × cap) let its slope reach 1.1 × the cap, now solved exactly; and on very
+  high notes into a hard fold the cap fell below 1, which made Power read x^0.57 (steep at the
+  start) and alias at −32 dB; a cap under 1 now means a plain cosine (−39 dB).
+- **No clicks** when a Warp envelope sweeps any family: no sample-to-sample step beyond the
+  family's own at a steady Warp 1 (for Sync, its largest hard-sync jump).
+- **Curves first tried too steep:** Power 2^(7·Warp) and Sigmoid 2^(6·Warp) became needles by Warp
+  ¼; now 2^(5·Warp) and 2^(4·Warp).
+- **Aliasing** (`docs/tests/06-alias.txt`, the batch 04 matrix plus 7 family settings): 429 of 490
+  family settings below −60 dB, worst −39 dB (Triangle fold at gain 10 on the top notes, as for
+  CZ). The Smooth curves alias least: on their own at most −68 dB, into the Sine fold below −64 dB
+  up to MIDI 108. Plain Sync at full Warp is the weakest alone (−48 dB at MIDI 108, a hard-sync
+  jump every cycle).
+
+![Spectrograms: Vowel, Vector bass, Smooth tour, Sync sweep](docs/tests/06-spectrograms.png)
+
+Renders: the design preset Vowel (with Vector x swept: the mod wheel comes in batch 09), plus
+Vector bass, Smooth tour and Sync sweep. Presets 01–15 are bit-identical to batch 05.
 
 ## Batch 05 · cost
 

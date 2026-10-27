@@ -173,6 +173,50 @@
       phrase: [...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, i * 0.3, 0.28]), ...[60, 67, 72, 79, 84, 91, 96, 103].map((n, i) => [n, 2.6 + i * 0.3, 0.28])],
       steps: [{ time: 2.55, params: { wave1: 5, warp1: 0.85, sfamily1: 0, shape1: 0 } }],
     },
+
+    // ---------- batch 06: out-of-bounds warps ----------
+    {
+      name: 'Vowel',
+      design: true,
+      about: 'Vector at Warp 1 with v = 2.5: the first part of each cycle reads 2.5 cycles, a formant. d sweeps from 0.1 to 0.9 and back, moving the formant like a vowel. (The design puts d on the mod wheel; that comes in batch 09, so a sweep stands in.)',
+      params: {
+        wfamily1: 1, vecx1: 0.1, vecy1: 2.5, warp1: 1, wenvdepth1: 0, warpkey1: 0, velwarp1: 0, volume: -12,
+        ...env('aenv', 1, [[0.15, 1], [6, 0.9], [0.6, 0]], 2, 3),
+      },
+      phrase: [...chord([45, 52, 57, 60], 0, 6.2, 90)],
+      sweeps: [{ id: 'vecx1', from: 0.1, to: 0.9, start: 0.2, end: 3.2 }, { id: 'vecx1', from: 0.9, to: 0.1, start: 3.2, end: 6.0 }],
+    },
+    {
+      name: 'Vector bass',
+      about: 'Vector at (0.15, 3.5) into a little Tanh: the Warp envelope plucks each note from a pure cosine to a hard formant and back.',
+      params: {
+        wfamily1: 1, vecx1: 0.15, vecy1: 3.5, warp1: 0, wenvdepth1: 1, warpkey1: 0, velwarp1: 0.4,
+        sfamily1: 2, sat1: 0, shape1: 0.35, shapekey1: 0,
+        ...env('wenv', 1, [[0.005, 1], [0.35, 0.15]], 2, 3),
+        ...env('aenv', 1, [[0.003, 1], [0.6, 0.6], [0.08, 0]], 2, 3),
+      },
+      phrase: [[33, 0, 0.3], [33, 0.4, 0.15], [45, 0.6, 0.2], [36, 0.9, 0.35], [38, 1.3, 0.3], [40, 1.7, 0.7]],
+    },
+    {
+      name: 'Smooth tour',
+      about: 'The three Smooth curves, each with Warp sweeping 0 → 1 → 0: Power (the cosine pushed to the end of the cycle), Sigmoid (squeezed into the middle), Bezier (handles at (0.1, 0.9): a rounded square). No corners anywhere.',
+      params: {
+        wfamily1: 2, curve1: 0, vecx1: 0.1, vecy1: 3.6, warp1: 0, warpkey1: 0, velwarp1: 0,
+        ...env('wenv', 1, [[0.9, 1], [0.9, 0]], 0, 2), ...env('aenv', 1, [[0.01, 1], [1.8, 1], [0.05, 0]], 2, 3),
+      },
+      phrase: [0, 1, 2].map((i) => [45, i * 1.9, 1.8]),
+      steps: [0, 1, 2].map((i) => ({ time: i * 1.9 - 0.01, params: { curve1: i } })),
+    },
+    {
+      name: 'Sync sweep',
+      about: 'Sync to ratio 12: the Warp envelope sweeps the synced cosine up on each note. Plain first (the hard-sync edge), then through the Triangle window (a smooth, vocal sweep).',
+      params: {
+        wfamily1: 3, ratio1: 12, warp1: 0, wenvdepth1: 1, warpkey1: 0, velwarp1: 0, window1: 0,
+        ...env('wenv', 1, [[1.2, 1], [0.6, 0.6]], 2, 3), ...env('aenv', 1, [[0.01, 1], [1.5, 0.9], [0.2, 0]], 2, 3),
+      },
+      phrase: [[40, 0, 1.6], [47, 1.8, 1.6], [40, 3.6, 1.6], [47, 5.4, 1.6]],
+      steps: [{ time: 3.55, params: { window1: 2 } }],
+    },
   ];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };

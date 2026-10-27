@@ -115,8 +115,47 @@
         const h = ph < 0.5 ? ph : ph - 0.5;
         return h < p ? 0.5 * h / p : 1;
       }
+      // ---- out-of-bounds families (batch 06); p and k carry each family's own values ----
+      case 7: { // Vector (VPS; Kleimola, Lazzarini, Timoney & Välimäki 2011): breakpoint (d, v) = (p, k)
+        const g = ph < p ? k * ph / p : k + (1 - k) * (ph - p) / (1 - p);
+        return g - Math.floor(g);
+      }
+      case 8:   // Smooth, power: φ^q, q = k
+        return Math.pow(ph, k);
+      case 9:   // Smooth, sigmoid: a tanh S through the middle of the cycle, steepness c = k
+        return 0.5 + 0.5 * Math.tanh(k * (ph - 0.5)) / Math.tanh(0.5 * k);
+      case 10:  // Smooth, Bezier: handles (hx, hy) = (p, k) and (1 − hx, 1 − hy)
+        return bezierAt(ph, p, k);
+      case 11: { // Sync: r = k times the frequency, hard-synced to the cycle
+        const u = k * ph;
+        return u - Math.floor(u);
+      }
     }
     return ph;
+  }
+  // cubic Bezier from (0, 0) to (1, 1) with handles (hx, hy) and (1 − hx, 1 − hy), read at x = φ
+  // (x(t) is monotonic for hx in 0–1; Newton's method from t = φ, then the value y(t))
+  function bezierAt(x, hx, hy) {
+    const bx = (t) => 3 * (1 - t) * (1 - t) * t * hx + 3 * (1 - t) * t * t * (1 - hx) + t * t * t;
+    let t = x;
+    for (let i = 0; i < 6; i++) {
+      const d = 3 * (1 - t) * (1 - t) * hx + 6 * (1 - t) * t * (1 - 2 * hx) + 3 * t * t * (hx);
+      if (Math.abs(d) < 1e-9) break;
+      t = Math.min(1, Math.max(0, t - (bx(t) - x) / d));
+    }
+    const y = 3 * (1 - t) * (1 - t) * t * hy + 3 * (1 - t) * t * t * (1 - hy) + t * t * t;
+    return y - Math.floor(y);
+  }
+  // its steepest slope dy/dx, from 64 points
+  function bezierSlope(hx, hy) {
+    let m = 0, x0 = 0, y0 = 0;
+    for (let i = 1; i <= 64; i++) {
+      const t = i / 64, x = 3 * (1 - t) * (1 - t) * t * hx + 3 * (1 - t) * t * t * (1 - hx) + t * t * t;
+      const y = 3 * (1 - t) * (1 - t) * t * hy + 3 * (1 - t) * t * t * (1 - hy) + t * t * t;
+      if (x > x0) m = Math.max(m, Math.abs(y - y0) / (x - x0));
+      x0 = x; y0 = y;
+    }
+    return m;
   }
   // window level (0–1) at phase φ
   function windowW(win, ph) {
@@ -133,9 +172,65 @@
   function waveSample(w, win, ph, p, k) {
     return 2 * carrier(warpU(w, ph, p, k)) * windowW(win, ph) - 1;
   }
+  const FAMILIES = ['CZ', 'Vector', 'Smooth', 'Sync'];
+  const CURVES = ['Power', 'Sigmoid', 'Bezier'];
+  // An out-of-bounds warp at Warp amount a, with the steepest slope it may have (gmax): into o.w, o.p,
+  // o.k (as warpU reads them). Warp 0 is a pure cosine in every family: the knobs set where Warp 1
+  // goes. Each family is held under gmax (the pitch cap, divided by the shaper's steepening).
+  //   Vector: (d, v) moves from (½, ½), the plain phase, to (vecx, vecy); d is kept where both slopes
+  //           stay under gmax
+  //   Smooth: Power q = 2^(5a), Sigmoid c = 4(2^(4a) − 1), Bezier handles from (⅓, ⅓) toward (vecx, vecy/4)
+  //   Sync:   r = 1 + a(ratio − 1)
+  function warpFamily(o, fam, curve, a, vx, vy, ratio, gmax, rmax) {
+    gmax = Math.max(gmax, 1);      // a pure cosine has slope 1: below that the cap means "no warp"
+    switch (fam) {
+      case 1: {
+        // (½, ½) is the plain phase; v > 1 reads more than a cycle by d (a formant)
+        let v = 0.5 + a * (vy - 0.5);
+        if (v > 1) v = Math.min(v, 0.5 * (gmax + 1));
+        const lo = Math.max(v / gmax, 1e-3), hi = Math.min(1 - Math.abs(1 - v) / gmax, 1 - 1e-3);
+        o.w = 7; o.k = v; o.p = clamp(0.5 + a * (vx - 0.5), lo, Math.max(lo, hi));
+        return;
+      }
+      case 2:
+        if (curve === 0) { o.w = 8; o.k = Math.min(Math.pow(2, 5 * a), gmax); o.p = Math.max(0.5, 1 - 4 / o.k); return; }
+        if (curve === 1) {
+          // the sigmoid's slope at its middle is c / (2·tanh(c/2)): the largest c under gmax, by iteration
+          let cmax = 1e-3;
+          if (gmax > 1.0001) { cmax = 2 * gmax; for (let i = 0; i < 30; i++) cmax = 2 * gmax * Math.tanh(0.5 * cmax); }
+          o.w = 9; o.k = Math.max(1e-3, Math.min(4 * (Math.pow(2, 4 * a) - 1), cmax)); o.p = Math.max(0, 0.5 - 2 / o.k); return;
+        }
+        {
+          // Bezier: blend toward the knobs' handles, and back off while the slope is too steep
+          let f = a, hx = 0, hy = 0;
+          for (let i = 0; i < 12; i++) {
+            hx = 1 / 3 + f * (vx - 1 / 3); hy = 1 / 3 + f * (vy / 4 - 1 / 3);
+            bzSlope = bezierSlope(hx, hy);
+            if (bzSlope <= gmax) break;
+            f = i < 11 ? f * 0.7 : 0;
+            if (f === 0) { hx = hy = 1 / 3; bzSlope = 1; break; }
+          }
+          o.w = 10; o.p = hx; o.k = hy;
+          return;
+        }
+      case 3:
+        o.w = 11; o.p = 0.5; o.k = Math.max(1, Math.min(1 + a * (ratio - 1), gmax, rmax));
+        return;
+    }
+  }
   // the warp's steepest slope, g′, is SLOPE[w]/p (Resonance: k; Saw-pulse at least 1)
-  const SLOPE = [0.5, 0.5, 0.5, 1, 0.5, 0, 0.5];
-  function maxSlope(w, p, k) { return w === 5 ? k : Math.max(SLOPE[w] / p, 1); }
+  const SLOPE = [0.5, 0.5, 0.5, 1, 0.5, 0, 0.5, 0, 0, 0, 0, 0];
+  let bzSlope = 1;               // the current Bezier's steepest slope (set with its handles)
+  function maxSlope(w, p, k) {
+    switch (w) {
+      case 5: case 11: return k;
+      case 7: return Math.max(k / p, Math.abs(1 - k) / (1 - p), 1);
+      case 8: return Math.max(k, 1);
+      case 9: return Math.max(k / (2 * Math.tanh(0.5 * k)), 1);
+      case 10: return Math.max(bzSlope, 1);
+    }
+    return Math.max(SLOPE[w] / p, 1);
+  }
   // Warp amount (0–1) → pivot, and → resonance ratio
   function pivotOf(a, cap) { return Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), cap); }
   function resoOf(a, kmax) { return Math.min(Math.pow(RESO_MAX, a), kmax); }
@@ -469,7 +564,7 @@
 
   const core = {
     levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX,
-    maxSlope, SLOPE, WARP_FMAX, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
+    maxSlope, SLOPE, WARP_FMAX, bezierAt, bezierSlope, FAMILIES, warpFamily, CHEB_LO, CHEB_HI, shapeADAA, shapeAnti, analogTab, expansion, residuals, phi2, q2,
     SHAPERS, FOLDS, SATS, NH, CURVE_N, makeShaper, shapeSample, chebWeights, morphCurves, curveTable, antiderivative,
     tableAt, antiAt, lockhart, analogFold, lambertWexp, DEFAULT_CURVES,
   };
@@ -497,9 +592,14 @@
     { id: 'mode', def: 1, min: 0, max: 1, step: 1 },             // 0 mono, 1 poly (8 voices)
     { id: 'glide', def: 0, min: 0, max: 2, curve: 3 },           // s, mono only
     // line 1
+    { id: 'wfamily1', def: 0, min: 0, max: 3, step: 1 },         // FAMILIES: CZ, Vector, Smooth, Sync
     { id: 'wave1', def: 0, min: 0, max: 6, step: 1 },            // WAVES
     { id: 'pair1', def: 0, min: 0, max: 7, step: 1 },            // 0 none, else WAVES[n − 1] on odd cycles
     { id: 'window1', def: 0, min: 0, max: 5, step: 1 },          // WINDOWS, on any wave
+    { id: 'vecx1', def: 0.5, min: 0, max: 1 },                   // Vector d (Bezier handle x) at Warp 1
+    { id: 'vecy1', def: 1.5, min: 0, max: 4 },                   // Vector v (Bezier handle y × 4) at Warp 1
+    { id: 'curve1', def: 1, min: 0, max: 2, step: 1 },           // Smooth: Power, Sigmoid, Bezier
+    { id: 'ratio1', def: 2, min: 1, max: 16 },                   // Sync ratio at Warp 1
     { id: 'warp1', def: 0, min: 0, max: 1 },                     // warp amount before the envelope
     { id: 'warpkey1', def: 0.3, min: 0, max: 1 },                // key follow: less warp above middle C
     { id: 'wenvdepth1', def: 1, min: -1, max: 1 },
@@ -620,6 +720,7 @@
       this.q0 = 0; this.carry = 0;                     // the sample waiting for its residuals, and the next one's
       this.rm = 0; this.ro = 0; this.rp = 0;           // residuals of this sample's breakpoints
       this.wp = 0.5; this.wk = 1;                      // pivot and resonance ratio, from warpPoint()
+      this.wo = { w: 0, p: 0.5, k: 1 };               // an out-of-bounds family's values
       this.k = {};          // per-block settings, filled by settings()
     }
     // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
@@ -657,14 +758,18 @@
       k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
       const pr = Math.round(P[PINDEX.pair1]);
       k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);
+      k.fam = Math.round(P[PINDEX.wfamily1]);
+      k.vx = P[PINDEX.vecx1]; k.vy = P[PINDEX.vecy1]; k.curve = Math.round(P[PINDEX.curve1]); k.ratio = P[PINDEX.ratio1];
+      if (k.fam > 0) { const wf = k.fam === 1 ? 7 : k.fam === 3 ? 11 : 8 + k.curve; k.w0 = k.w1 = wf; }   // no wave pairs outside CZ
       // pitch cap: the steepest slope SLOPE/p never reads the cosine faster than WARP_FMAX
       k.cap = Math.max(SLOPE[k.w0], SLOPE[k.w1]) * hz / (WARP_FMAX * e.srOS);
       k.kHost = RESO_NYQ * e.sr / hz; k.kOS = RESO_OS * e.srOS / hz; k.lnReso = Math.log(RESO_MAX);
       k.fr = hz / e.srOS;                 // the note as a share of the internal rate
       // where the wave can jump or kink (see render)
       k.splitP = k.w0 === 6 || k.w1 === 6;
+      k.splitD = k.w0 === 7;                // Vector kinks at d
       k.splitHalf = k.win >= 2;
-      k.splitEnd = k.win !== 0 || k.w0 === 5 || k.w1 === 5 || k.splitP;   // Double pulse at p = ½ jumps at the end
+      k.splitEnd = k.win !== 0 || k.w0 === 5 || k.w1 === 5 || k.splitP || k.w0 === 11;   // Sync jumps at the end   // Double pulse at p = ½ jumps at the end
       // the shaper
       const sh = this.sh;
       sh.ver++;
@@ -684,6 +789,12 @@
     // the wave's fastest frequency as a share of the internal rate (for the Chebyshev band limit)
     warpPoint(a, E) {
       const k = this.k;
+      if (k.fam > 0) {
+        warpFamily(this.wo, k.fam, k.curve, a, k.vx, k.vy, k.ratio, WARP_FMAX / (k.fr * E), Math.min(k.kHost, k.kOS / E));
+        this.wp = this.wo.p; this.wk = this.wo.k;
+        this.sh.fpk = k.fr * maxSlope(k.w0, this.wp, this.wk);
+        return;
+      }
       this.wp = Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), Math.min(0.5, k.cap * E));
       this.wk = Math.max(1, Math.min(Math.pow(RESO_MAX, a), k.kHost, k.kOS / E));
       this.sh.fpk = k.fr * Math.max(maxSlope(k.w0, this.wp, this.wk), maxSlope(k.w1, this.wp, this.wk));
@@ -763,7 +874,7 @@
         // Resonance at the end of the cycle (hard sync), and a window at ½ and at the end of the cycle.
         // (Splitting where the wave is smooth made the steep peaks alias more: −32 instead of −66 dB.)
         const B = this.bps;
-        B[0] = k.splitP ? p : 2; B[1] = k.splitHalf ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
+        B[0] = k.splitP || k.splitD ? p : 2; B[1] = k.splitHalf ? 0.5 : 2; B[2] = k.splitP ? 0.5 + p : 2;
         const end = wrapped ? 1 : ph;
         let split = wrapped && k.splitEnd;
         for (let j = 0; j < 3; j++) if (B[j] < 1 && B[j] > prev && B[j] <= end) { split = true; break; }

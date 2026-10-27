@@ -72,6 +72,12 @@ const WAVES = [
   ['Saw-pulse', { wave1: 4 }], ['Reso', { wave1: 5 }], ['Reso+Saw', { wave1: 5, window1: 1 }],
   ['Reso+Tri', { wave1: 5, window1: 2 }], ['Reso+Trap', { wave1: 5, window1: 3 }], ['Double pulse', { wave1: 6 }],
 ];
+// the out-of-bounds families (batch 06)
+const FAMILIES = [
+  ['Vector (0.2, 2.5)', { wfamily1: 1, vecx1: 0.2, vecy1: 2.5 }], ['Vector (0.8, 3.5)', { wfamily1: 1, vecx1: 0.8, vecy1: 3.5 }],
+  ['Power', { wfamily1: 2, curve1: 0 }], ['Sigmoid', { wfamily1: 2, curve1: 1 }], ['Bezier', { wfamily1: 2, curve1: 2, vecx1: 0.1, vecy1: 3.6 }],
+  ['Sync 7.3', { wfamily1: 3, ratio1: 7.3 }], ['Sync 7.3 + Tri', { wfamily1: 3, ratio1: 7.3, window1: 2 }],
+];
 const HARM = Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1 / (i + 1)]));
 const SHAPERS = [
   ['none', { sfamily1: 0, shape1: 0 }],
@@ -86,11 +92,13 @@ const NOTES = [24, 48, 72, 96, 108];
 
 if (require.main === module) {
   const quick = process.argv.includes('--quick');
+  const only = process.argv.includes('--families');
+  const waves = only ? FAMILIES : WAVES.concat(FAMILIES);
   const warps = quick ? [1] : [0.5, 1];
   const notes = quick ? [48, 96] : NOTES;
   console.log('alias energy, dB below the harmonics (20 Hz – 20 kHz); notes ' + notes.join(', '));
   let worst = -Infinity, worstName = '';
-  for (const [sn, sp] of SHAPERS) for (const [wn, wp] of WAVES) for (const wa of warps) {
+  for (const [sn, sp] of SHAPERS) for (const [wn, wp] of waves) for (const wa of warps) {
     const row = notes.map((n) => measure({ ...wp, ...sp, warp1: wa }, n));
     const m = Math.max(...row);
     if (m > worst) { worst = m; worstName = sn + ' · ' + wn + ' · Warp ' + wa + ' · MIDI ' + notes[row.indexOf(m)]; }
@@ -98,4 +106,4 @@ if (require.main === module) {
   }
   console.log('\nworst: ' + worst.toFixed(1) + ' dB  (' + worstName + ')');
 }
-module.exports = { measure, renderSteady, aliasDb, WAVES, SHAPERS, NOTES };
+module.exports = { measure, renderSteady, aliasDb, WAVES, FAMILIES, SHAPERS, NOTES };

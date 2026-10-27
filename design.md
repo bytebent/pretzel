@@ -139,17 +139,30 @@ The windows multiply the wave's level:
   mapped to that register by the CZ firmware, which MAME does not contain and which is Casio's.
   Pretzel uses its own perceptual curve, tuned by ear. [Decided]
 
-### 4.2 Out-of-bounds families [Decided: try all three in the bench]
+### 4.2 Out-of-bounds families [Decided: try all three in the bench; built in batch 06]
 
-- **Vector (VPS).** The CZ breakpoint becomes a point (d, v), set by two knobs:
-  g = v·φ/d before d, then v + (1 − v)(φ − d)/(1 − d). When v > 1, the first segment reads more
-  than one cycle and a formant appears. Wraps get polyBLEP. (Kleimola, Lazzarini, Timoney and
-  Välimäki, DAFx-11.)
-- **Smooth.** Bends with no corners: a power curve, a sigmoid, or a two-handle Bezier. Their slope
-  is bounded, so they alias much less than CZ corners. A softer, "modern" alternative to the CZ
-  waves.
-- **Sync.** g = (r·φ) mod 1. This is hard sync inside one oscillator, with r from 1 to 16. Choose
-  it plain, or with any window.
+**Family** chooses CZ, Vector, Smooth or Sync. In every family Warp 0 is a pure cosine and the
+knobs set where Warp 1 goes, so the Warp envelope sweeps from a plain cosine to the family's
+shape. Each family is held under the pitch cap (divided by the shaper's steepening), and wave
+pairs are a CZ feature only.
+
+- **Vector (VPS).** The CZ breakpoint becomes a point (d, v):
+  g = v·φ/d before d, then v + (1 − v)(φ − d)/(1 − d). (½, ½) is the plain phase; Warp moves the
+  point from there to (Vector x, Vector y). When v > 1, the first part of the cycle reads more than
+  one cycle and a formant appears; d moves it. The wave kinks at d, so the sample is split there.
+  (Kleimola, Lazzarini, Timoney and Välimäki, DAFx-11.) The design first had (½, 1) as the
+  plain point; that reads a whole cycle in the first half (an octave up), so it is (½, ½).
+- **Smooth.** Bends with no corners, so they alias least:
+  - *Power*, g = φ^q with q = 2^(5·Warp): the cosine pushed toward the end of the cycle, a smooth
+    pulse at the top.
+  - *Sigmoid*, a tanh S through the middle with steepness 4(2^(4·Warp) − 1): squeezed into the
+    middle.
+  - *Bezier*, handles (hx, hy) and (1 − hx, 1 − hy), moving from a straight line toward (Vector x,
+    Vector y / 4). Handles near (0.1, 0.9) give a rounded square.
+  (Power 2^(7·Warp) and Sigmoid 2^(6·Warp) were first tried; both were a needle by Warp ¼.)
+- **Sync.** g = (r·φ) mod 1, with r from 1 at Warp 0 to Ratio (1–16) at Warp 1: hard sync inside
+  one oscillator, a linear sweep. Plain (it jumps at every cycle, split and corrected like
+  Resonance) or with any window.
 - **Twist** is the fourth out-of-bounds warp, but it is a loop rather than a shape (section 7).
 
 ## 5. Shaper (waveshaping)
@@ -355,9 +368,9 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | | `pair` | None, Saw … Double pulse | None | Alternating second wave |
 | | `window` | None, Saw, Tri, Trap, Pulse, Double saw | None | On any wave |
 | | `warp` | 0–1 | 0 | M. Warp amount; the Warp envelope adds to it |
-| | `vecx`, `vecy` | 0–1, 0–4 | 0.5, 1 | M. Vector point (d, v) |
+| | `vecx`, `vecy` | 0–1, 0–4 | 0.5, 1.5 | M. Vector point (d, v) at Warp 1; also the Bezier's handle |
 | | `curve` | Power, Sigmoid, Bezier | Sigmoid | Smooth curve type |
-| | `ratio` | 1–16 | 2 | M. Sync ratio |
+| | `ratio` | 1–16 | 2 | M. Sync ratio at Warp 1 |
 | | `warpkey` | 0–1 | 0.3 | Key follow |
 | Shaper | `sfamily` | Chebyshev, Fold, Saturate, Drawn | Chebyshev | |
 | | `shape` | 0–1 | 0 | M. Drive into the shaper |
@@ -398,7 +411,7 @@ Each one checks one claim of the design. [Decided]
 | Inside Out | Shape→Warp, Sine fold | Order |
 | Turning | Saw + Fold, LFO on Morph | Morph sounds like one wave, not two |
 | Knot | Saw, Fold, Twist 0.6 | Twist stays stable at every pitch |
-| Vowel | Vector, v = 2.5, mod wheel on `vecx` | VPS formants |
+| Vowel | Vector, v = 2.5, `vecx` swept (mod wheel from batch 09) | VPS formants |
 
 ## 12. Live view
 

@@ -512,5 +512,63 @@ const cosine = (ph) => -Math.cos(2 * Math.PI * ph);     // what Warp 0 gives (2c
   check('20. the hardest case, Triangle fold at gain 10 on a square-like wave: below −35 dB (was +13)', w < -35, w.toFixed(1) + ' dB at worst (' + at + ')');
 }
 
+/* ================= batch 06: out-of-bounds warps ================= */
+
+/* ---------- 21. the families ---------- */
+{
+  const o = {};
+  const sample = (fam, curve, a, vx, vy, r, gmax) => { core.warpFamily(o, fam, curve, a, vx, vy, r, gmax || 1e9, 1e9); return (ph) => core.waveSample(o.w, 0, ph, o.p, o.k); };
+  const pure = (f) => { const H = harmonics(f, 2048, 12); return dB(Math.max(H[0], ...H.slice(2)) / H[1]); };
+  let worst = -Infinity;
+  for (const [fam, curve, vx, vy, r] of [[1, 0, 0.1, 3.9, 2], [1, 0, 0.9, 0, 2], [2, 0, 0.5, 1, 2], [2, 1, 0.5, 1, 2], [2, 2, 0.05, 4, 2], [3, 0, 0.5, 1, 13.7]])
+    worst = Math.max(worst, pure(sample(fam, curve, 0, vx, vy, r)));
+  check('21. Warp 0 is a pure cosine in every family, whatever the knobs', worst < -60, 'other harmonics ' + worst.toFixed(0) + ' dB');
+  check('21. Vector at (½, ½) is a pure cosine even at Warp 1', pure(sample(1, 0, 1, 0.5, 0.5, 2)) < -60);
+  check('21. Sync at ratio 1 is a pure cosine even at Warp 1', pure(sample(3, 0, 1, 0.5, 1, 1)) < -60);
+  // Vector: raising v moves the formant up
+  const peak = (f) => { const H = harmonics(f, 4096, 40); let k = 1; for (let i = 2; i <= 40; i++) if (H[i] > H[k]) k = i; return k; };
+  const pk = [1.5, 2.5, 3.5].map((vy) => peak(sample(1, 0, 1, 0.2, vy, 2)));
+  check('21. Vector: a larger v moves the strongest harmonic up (d = 0.2)', pk[0] < pk[1] && pk[1] < pk[2], 'v 1.5, 2.5, 3.5 → harmonic ' + pk.join(', '));
+  // Sync with a triangle window: the strongest harmonic sits at the ratio
+  core.warpFamily(o, 3, 0, 1, 0.5, 1, 7, 1e9, 1e9);
+  const sp = peak((ph) => core.waveSample(o.w, 2, ph, o.p, o.k));
+  check('21. Sync 7 through the Triangle window: strongest harmonic 7', sp === 7, 'harmonic ' + sp);
+  // every family stays under the pitch cap, and a cap below 1 means no warp at all
+  let over = 0;
+  for (const [fam, curve, vx, vy, r] of [[1, 0, 0.1, 3.9, 2], [1, 0, 0.9, 0.2, 2], [2, 0, 0.5, 1, 2], [2, 1, 0.5, 1, 2], [2, 2, 0.05, 4, 2], [3, 0, 0.5, 1, 13.7]])
+    for (const g of [1.5, 4, 30]) { core.warpFamily(o, fam, curve, 1, vx, vy, r, g, 1e9); over = Math.max(over, core.maxSlope(o.w, o.p, o.k) / g); }
+  check('21. every family keeps its steepest slope under the pitch cap', over <= 1.0001, 'largest slope / cap ' + over.toFixed(3));
+  const capped = pure(sample(2, 0, 1, 0.5, 1, 2, 0.6));
+  check('21. a cap below 1 (a very high note into a hard fold) leaves a pure cosine', capped < -60);
+  // a Warp envelope sweeping each family never clicks: no sample-to-sample step larger than the
+  // family's own at a steady Warp 1 (Sync jumps at every cycle by design)
+  const maxStep = (x) => { let m = 0; for (let i = 1; i < x.length; i++) m = Math.max(m, Math.abs(x[i] - x[i - 1])); return m; };
+  let jump = 0, jn = '';
+  for (const [n, p] of [['Vector', { wfamily1: 1, vecx1: 0.15, vecy1: 3.5 }], ['Power', { wfamily1: 2, curve1: 0 }], ['Sigmoid', { wfamily1: 2, curve1: 1 }], ['Bezier', { wfamily1: 2, curve1: 2, vecx1: 0.1, vecy1: 3.6 }], ['Sync', { wfamily1: 3, ratio1: 9.3 }]]) {
+    const sweep = render(1.6, (e) => { apply(e, { ...PLAIN, ...p, warp1: 0, wenvdepth1: 1, ...env('wenv', 1, [[0.7, 1], [0.7, 0]], 0, 2) }); e.noteOn(45, 100); }).L;
+    // (for Sync, the steady reference is ratio 9.5, where the hard-sync jump is largest: a sweep passes it)
+    const still = render(0.6, (e) => { apply(e, { ...PLAIN, ...p, warp1: 1, ...(n === 'Sync' ? { ratio1: 9.5 } : {}) }); e.noteOn(45, 100); }).L;
+    const r = maxStep(steady(sweep, 0.05, 1.5)) / maxStep(steady(still, 0.1, 0.6));
+    if (r > jump) { jump = r; jn = n; }
+  }
+  check('21. a Warp sweep through every family has no clicks (no step beyond its own at Warp 1)', jump < 1.2, jump.toFixed(2) + ' × at worst (' + jn + ')');
+  // wave pairs are a CZ feature: outside CZ the pair setting changes nothing
+  const a1 = render(0.3, (e) => { apply(e, { ...PLAIN, wfamily1: 1, warp1: 0.6, vecy1: 2 }); e.noteOn(50, 100); }).L;
+  const a2 = render(0.3, (e) => { apply(e, { ...PLAIN, wfamily1: 1, warp1: 0.6, vecy1: 2, pair1: 3 }); e.noteOn(50, 100); }).L;
+  let d = 0; for (let i = 0; i < a1.length; i++) d = Math.max(d, Math.abs(a1[i] - a2[i]));
+  check('21. outside CZ, the wave pair setting changes nothing', d === 0);
+}
+
+/* ---------- 22. aliasing of the families ---------- */
+{
+  const { measure, FAMILIES } = require(path.join(__dirname, '..', 'tools', 'alias.js'));
+  let w = -Infinity, at = '';
+  for (const [n, p] of FAMILIES) for (const m of [72, 108]) { const v = measure({ ...p, warp1: 1 }, m); if (v > w) { w = v; at = n + ' MIDI ' + m; } }
+  check('22. every family on its own at full Warp: aliasing below −45 dB up to MIDI 108', w < -45, w.toFixed(1) + ' dB at worst (' + at + ')');
+  w = -Infinity;
+  for (const [n, p] of FAMILIES.filter(([n]) => /Power|Sigmoid|Bezier/.test(n))) for (const m of [72, 108]) { const v = measure({ ...p, warp1: 1, sfamily1: 1, fold1: 1, shape1: 0.5 }, m); if (v > w) { w = v; at = n + ' MIDI ' + m; } }
+  check('22. the Smooth curves into the Sine fold: below −60 dB up to MIDI 108', w < -60, w.toFixed(1) + ' dB at worst (' + at + ')');
+}
+
 console.log('\n' + (count - failed) + ' of ' + count + ' tests passed');
 process.exit(failed ? 1 : 0);
