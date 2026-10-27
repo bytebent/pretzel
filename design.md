@@ -21,8 +21,8 @@ Second pass, settled. Nothing is built; the batches are in `plan.md`.
 - **Not a CZ remake.** The CZ is the starting point for the warp, not a target to match. Nothing
   is tested against a real CZ. [Decided]
 - Some out-of-bounds phase warps beyond the CZ: Vector Phaseshaping, smooth curves, sync, and
-  feedback into the phase. All three warp families are tried in the bench; listening decides which
-  ship. [Decided]
+  feedback into the phase. All three warp families ship (decided after the batch 06 renders).
+  [Decided]
 - Not a creature or a body. Pretzel is abstract, but it is a good source for mouth-tube and
   beak-tube. [Decided]
 - Built the bytebent way: JavaScript reference engine and browser bench first, then the C++
@@ -139,7 +139,7 @@ The windows multiply the wave's level:
   mapped to that register by the CZ firmware, which MAME does not contain and which is Casio's.
   Pretzel uses its own perceptual curve, tuned by ear. [Decided]
 
-### 4.2 Out-of-bounds families [Decided: try all three in the bench; built in batch 06]
+### 4.2 Out-of-bounds families [Decided: all three ship; built in batch 06]
 
 **Family** chooses CZ, Vector, Smooth or Sync. In every family Warp 0 is a pure cosine and the
 knobs set where Warp 1 goes, so the Warp envelope sweeps from a plain cosine to the family's
@@ -461,6 +461,5 @@ Engine interface: `new PretzelEngine(sr, seed)`, `setParam`, `noteOn` / `noteOff
 1. Shape → Warp: definition A, B, or both (bench).
 2. Morph: which method sounds like one wave turning inside out (bench).
 3. Twist: what it sounds like across pitches and shapers (listening).
-4. Which out-of-bounds warp families ship (listening).
-5. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
-6. How many voices the browser bench plays.
+4. Eco (2×) mode and the voice count: checked again with the C++ port on the Intel Mac runner.
+5. How many voices the browser bench plays.
