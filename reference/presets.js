@@ -79,6 +79,87 @@
       },
       phrase: [[60, 0, 0.5], [63, 0.4, 0.5], [67, 0.8, 0.3], [70, 1.05, 0.6], [68, 1.6, 0.25], [67, 1.8, 1.0]],
     },
+
+    // ---------- batch 03: the shaper ----------
+    {
+      name: 'Organ Pretzel',
+      design: true,
+      about: 'Warp 0 (a pure cosine) into Chebyshev at Shape 1: a drawbar set of exact harmonics 1, 2, 3, 4, 6, 8 and 12. The shaper alone.',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 0, shape1: 1, shapekey1: 0, velshape1: 0, velamp1: 0.3, volume: -12,
+        h1_1: 1, h2_1: 0.7, h3_1: 0.5, h4_1: 0.35, h6_1: 0.25, h8_1: 0.3, h12_1: 0.15,
+        ...env('aenv', 1, [[0.004, 1], [0.1, 1], [0.08, 0]], 2, 3),
+      },
+      phrase: [...chord([48, 55, 64, 67], 0, 1.2), ...chord([50, 57, 65, 69], 1.3, 1.2), ...chord([43, 55, 62, 71], 2.6, 1.6)],
+    },
+    {
+      name: 'Linked',
+      design: true,
+      about: 'Saw into Chebyshev (odd harmonics), Link 1: the Warp envelope opens both axes at once, so each attack bends time and level together.',
+      params: {
+        wave1: 0, warp1: 0, sfamily1: 0, shape1: 0, senvdepth1: 0, link1: 1, warpkey1: 0.2, shapekey1: 0.2,
+        h1_1: 1, h3_1: 0.6, h5_1: 0.4, h7_1: 0.3, h9_1: 0.2,
+        ...env('wenv', 1, [[0.12, 1], [0.9, 0.25], [0.3, 0]], 2, 3),
+        ...env('aenv', 1, [[0.01, 1], [0.8, 0.8], [0.3, 0]], 2, 3),
+      },
+      phrase: [[40, 0, 0.8], [43, 0.9, 0.4], [45, 1.4, 0.4], [47, 1.9, 1.2], [52, 3.2, 1.0]],
+    },
+    {
+      name: 'Folded Saw',
+      design: true,
+      about: 'A gently warped Saw into the Sine folder; the Shape envelope sweeps the fold gain up to 10 and back. Not band-limited yet (batch 04): high folds alias.',
+      params: {
+        wave1: 0, warp1: 0.25, wenvdepth1: 0, sfamily1: 1, fold1: 1, shape1: 0, senvdepth1: 1, shapekey1: 0,
+        ...env('senv', 1, [[1.6, 1], [1.6, 0.15]], 0, 2),
+        ...env('aenv', 1, [[0.02, 1], [3.0, 0.9], [0.4, 0]], 2, 3),
+      },
+      phrase: [[36, 0, 3.3], [43, 0, 3.3]],
+    },
+    {
+      name: 'Shaper tour',
+      about: 'A pure cosine (Warp 0) through each shaper, Shape sweeping 0 → 1 → 0: Chebyshev (harmonics 1/k), Fold Triangle, Sine, Analog, Saturate Tanh, Arctan, Cubic, Drawn (terraces).',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, shape1: 0, senvdepth1: 1, shapekey1: 0, velshape1: 0, morph1: 1 / 3,
+        ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1 / (i + 1)])),
+        ...env('senv', 1, [[0.6, 1], [0.6, 0]], 0, 2),
+        ...env('aenv', 1, [[0.01, 1], [1.2, 1], [0.05, 0]], 2, 3),
+      },
+      phrase: [0, 1, 2, 3, 4, 5, 6, 7].map(i => [48, i * 1.3, 1.2]),
+      steps: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 2, 0], [2, 0, 0], [2, 0, 1], [2, 0, 2], [3, 0, 0]]
+        .map(([f, fo, sa], i) => ({ time: i * 1.3 - 0.01, params: { sfamily1: f, fold1: fo, sat1: sa } })),
+    },
+    {
+      name: 'Drawn morph',
+      about: 'A lightly warped Saw through the drawn keyframes at Shape 1, Morph moving slowly through all four: soft S, terraces, sine fold, full-wave rectifier (an octave up).',
+      params: {
+        wave1: 0, warp1: 0.15, wenvdepth1: 0, sfamily1: 3, shape1: 1, shapekey1: 0, velshape1: 0, morph1: 0,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[45, 0, 6.2], [52, 0, 6.2]],
+      sweeps: [{ id: 'morph1', from: 0, to: 1, start: 0.3, end: 5.9 }],
+    },
+    {
+      name: 'Bias',
+      about: 'A pure cosine into Tanh at Shape 0.6. Bias 0 gives odd harmonics only; Bias moves to +0.8 and then −0.8, bringing in even harmonics.',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 2, sat1: 0, shape1: 0.6, shapekey1: 0, velshape1: 0, bias1: 0,
+        ...env('aenv', 1, [[0.05, 1], [6, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[48, 0, 6.2]],
+      sweeps: [{ id: 'bias1', from: 0, to: 0.8, start: 1, end: 3 }, { id: 'bias1', from: 0.8, to: -0.8, start: 3.5, end: 5.5 }],
+    },
+    {
+      name: 'Tilt and Odd-Even',
+      about: 'All 16 Chebyshev harmonics at full, Shape 1. Tilt sweeps from dark (−1) to bright (+1) and back to 0; then Odd/Even sweeps from odd-only cut (−1, hollow octaves) to even cut (+1, a square-like tone).',
+      params: {
+        wave1: 0, warp1: 0, wenvdepth1: 0, sfamily1: 0, shape1: 1, shapekey1: 0, velshape1: 0, tilt1: -1, oddeven1: 0,
+        ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['h' + (i + 1) + '_1', 1])),
+        ...env('aenv', 1, [[0.05, 1], [7, 1], [0.4, 0]], 2, 3),
+      },
+      phrase: [[43, 0, 7.0]],
+      sweeps: [{ id: 'tilt1', from: -1, to: 1, start: 0.3, end: 3.0 }, { id: 'tilt1', from: 1, to: 0, start: 3.0, end: 3.5 },
+        { id: 'oddeven1', from: -1, to: 1, start: 3.6, end: 6.8 }],
+    },
   ];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { PRESETS, env };

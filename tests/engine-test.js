@@ -272,5 +272,169 @@ function mameWindow(win, pos) {
   check('10. MIDI 108 at full Warp on every wave stays finite and unclipped', finite && worst < 1, 'peak ' + worst.toFixed(3));
 }
 
+/* ================= batch 03: the shaper ================= */
+const sh = core.makeShaper();
+function setShaper(fam, sub, bias, h, tilt, oe) {
+  sh.fam = fam; sh.sub = sub || 0; sh.bias = bias || 0;
+  const hh = new Float64Array(16); (h || [1]).forEach((v, i) => { hh[i] = v; });
+  core.chebWeights(sh.e, hh, tilt || 0, oe || 0);
+  core.morphCurves(sh, core.DEFAULT_CURVES, core.DEFAULT_CURVES.map(core.antiderivative), 4, 0);
+}
+const cosine = (ph) => -Math.cos(2 * Math.PI * ph);     // what Warp 0 gives (2c − 1)
+
+/* ---------- 11. Shape 0 passes the wave unchanged ---------- */
+{
+  const names = [];
+  let worst = 0;
+  for (const [fam, sub] of [[0, 0], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2], [3, 0]]) {
+    setShaper(fam, sub, 0, [0.2, 0.7, 0.5, 0, 1]);
+    for (let i = 0; i <= 200; i++) { const x = -1 + i / 100; worst = Math.max(worst, Math.abs(core.shapeSample(sh, x, 0) - x)); }
+    names.push(core.SHAPERS[fam] + (fam === 1 ? ' ' + core.FOLDS[sub] : fam === 2 ? ' ' + core.SATS[sub] : ''));
+  }
+  check('11. Shape 0, Bias 0 passes the wave unchanged in all 8 shapers', worst === 0, names.join(', '));
+  // and Shape moves away from it smoothly: a tiny Shape changes the wave only a little
+  let jump = 0;
+  for (const [fam, sub] of [[0, 0], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2], [3, 0]]) {
+    setShaper(fam, sub, 0, [0.2, 0.7, 0.5, 0, 1]);
+    for (let i = 0; i <= 200; i++) { const x = -1 + i / 100; jump = Math.max(jump, Math.abs(core.shapeSample(sh, x, 1e-4) - x)); }
+  }
+  check('11. no jump: Shape 0.0001 moves no shaper by more than 1%', jump < 0.01, 'largest ' + jump.toExponential(1));
+}
+
+/* ---------- 12. Chebyshev: exact harmonics ---------- */
+{
+  const h = [1, 0.5, 0, 0.25, 0.8, 0, 0, 0.1, 0, 0, 0, 0, 0, 0, 0, 0.3];
+  setShaper(0, 0, 0, h);
+  const H = harmonics((ph) => core.shapeSample(sh, cosine(ph), 1), 4096, 20), sum = h.reduce((a, b) => a + b, 0);
+  let worst = 0;
+  for (let k = 1; k <= 20; k++) worst = Math.max(worst, Math.abs(H[k] - (k <= 16 ? h[k - 1] / sum : 0)));
+  check('12. a full-scale cosine at Shape 1 gives harmonic k at h_k (scaled to add up to 1), nothing above 16', worst < 1e-9, 'worst ' + worst.toExponential(1));
+  check('12. no DC from Chebyshev on a cosine', Math.abs(H[0]) < 1e-9);
+  // Shape brings the harmonics in step by step, low ones first
+  setShaper(0, 0, 0, Array(16).fill(1));
+  const at = (s) => harmonics((ph) => core.shapeSample(sh, cosine(ph), s), 2048, 16);
+  const centroid = (H) => { let a = 0, b = 0; for (let k = 1; k <= 16; k++) { a += k * H[k] * H[k]; b += H[k] * H[k]; } return a / b; };
+  const c = [0, 0.25, 0.5, 0.75, 1].map((s) => centroid(at(s)));
+  check('12. Chebyshev brightens at every step of Shape', c.every((v, i) => !i || v > c[i - 1]), c.map((v) => v.toFixed(2)).join(' → '));
+  const half = at(0.5);
+  check('12. at Shape 0.5 the low harmonics lead: h2 above h8 above h16', half[2] > half[8] && half[8] > half[16], [2, 8, 16].map((k) => dB(half[k]).toFixed(0)).join(' / ') + ' dB');
+  // after a warp, the shaper gives the warped wave's harmonics k·g(φ): the identity S(cos θ) = Σ e_k cos kθ
+  setShaper(0, 0, 0, [0, 0, 1]);
+  const p = core.pivotOf(0.5, 0);
+  let d = 0;
+  for (let i = 0; i < 512; i++) { const ph = i / 512, u = core.warpU(0, ph, p, 1); d = Math.max(d, Math.abs(core.shapeSample(sh, core.waveSample(0, 0, ph, p, 1), 1) - (-Math.cos(3 * 2 * Math.PI * u)))); }
+  check('12. after a warp, harmonic 3 alone is the cosine read at 3 × the warped phase (to the cosine table\'s precision)', d < 1e-5, 'worst ' + d.toExponential(1));
+}
+
+/* ---------- 13. Tilt and Odd/Even ---------- */
+{
+  const all = Array(16).fill(1);
+  const H = (tilt, oe) => { setShaper(0, 0, 0, all, tilt, oe); return harmonics((ph) => core.shapeSample(sh, cosine(ph), 1), 2048, 16); };
+  const up = H(1, 0), down = H(-1, 0);
+  check('13. Tilt +1: harmonic 16 is 16 times harmonic 1', Math.abs(up[16] / up[1] - 16) < 1e-6, (up[16] / up[1]).toFixed(3));
+  check('13. Tilt −1: harmonic 16 is 1/16 of harmonic 1', Math.abs(down[16] / down[1] - 1 / 16) < 1e-6, (down[16] / down[1]).toFixed(4));
+  const odd = H(0, 1), even = H(0, -1);
+  check('13. Odd/Even +1 leaves odd harmonics only', [2, 4, 8, 16].every((k) => odd[k] < 1e-12) && odd[3] > 0.01);
+  check('13. Odd/Even −1 leaves the fundamental and even harmonics', [3, 5, 9, 15].every((k) => even[k] < 1e-12) && even[1] > 0.01 && even[2] > 0.01);
+}
+
+/* ---------- 14. Fold and Saturate ---------- */
+{
+  setShaper(1, 1);
+  let d = 0;
+  for (let i = 0; i <= 200; i++) { const x = -1 + i / 100; d = Math.max(d, Math.abs(core.shapeSample(sh, x, 1) - Math.sin(10 * Math.asin(x)))); }
+  check('14. Sine fold at Shape 1 is sin(10·asin x)', d < 1e-12);
+  // folding adds zero crossings as Shape rises, for all three folders
+  for (const sub of [0, 1, 2]) {
+    setShaper(1, sub);
+    const zc = (s) => { let c = 0, prev = core.shapeSample(sh, cosine(0.001), s); for (let i = 1; i < 2000; i++) { const y = core.shapeSample(sh, cosine((i + 0.5) / 2000), s); if ((y < 0) !== (prev < 0)) c++; prev = y; } return c; };
+    const z = [0, 0.4, 0.7, 1].map(zc);
+    check('14. ' + core.FOLDS[sub] + ' fold: more folds as Shape rises', z.every((v, i) => !i || v > z[i - 1]), 'zero crossings per cycle ' + z.join(' → '));
+  }
+  // every folder and saturator stays within ±1.05
+  let pk = 0;
+  for (const [f, sub] of [[1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]) { setShaper(f, sub); for (const s of [0.2, 0.5, 1]) for (let i = 0; i <= 400; i++) pk = Math.max(pk, Math.abs(core.shapeSample(sh, -1 + i / 200, s))); }
+  check('14. folders and saturators stay within ±1.05', pk < 1.05, 'peak ' + pk.toFixed(3));
+  // Lambert W: w·e^w = z across 600 orders of magnitude
+  let lw = 0;
+  for (let L = -40; L < 300; L += 0.37) { const w = core.lambertWexp(L); lw = Math.max(lw, Math.abs(Math.log(w) + w - L)); }
+  check('14. Lambert W solves w·e^w = e^L from L = −40 to 300', lw < 1e-6, 'worst error in log ' + lw.toExponential(1));
+  // symmetric saturation of a cosine gives odd harmonics only; Bias brings in even ones
+  for (const sub of [0, 1, 2]) {
+    setShaper(2, sub, 0);
+    const a = harmonics((ph) => core.shapeSample(sh, cosine(ph), 0.7), 2048, 6);
+    setShaper(2, sub, 0.5);
+    const b = harmonics((ph) => core.shapeSample(sh, cosine(ph), 0.7), 2048, 6);
+    check('14. ' + core.SATS[sub] + ': odd harmonics only at Bias 0; Bias 0.5 adds even ones', a[2] < 1e-9 && a[4] < 1e-9 && a[3] > 1e-3 && dB(b[2] / b[1]) > -40, 'h2 at Bias 0.5: ' + dB(b[2] / b[1]).toFixed(0) + ' dB');
+  }
+}
+
+/* ---------- 15. Drawn curves ---------- */
+{
+  const keys = core.DEFAULT_CURVES, F = keys.map(core.antiderivative);
+  // morphing the antiderivatives equals the antiderivative of the morph
+  let d = 0;
+  for (const m of [0.1, 0.37, 0.5, 0.82, 1]) {
+    core.morphCurves(sh, keys, F, 4, m);
+    const Fm = core.antiderivative(sh.dy);
+    for (let j = 0; j <= core.CURVE_N; j++) d = Math.max(d, Math.abs(Fm[j] - sh.dF[j]));
+  }
+  check('15. morphed antiderivatives equal the antiderivative of the morphed curve', d < 1e-12, 'worst ' + d.toExponential(1));
+  // the stored antiderivative's slope is the curve, anywhere (not only on table points)
+  core.morphCurves(sh, keys, F, 4, 0.6);
+  let s2 = 0;
+  for (let i = 1; i < 1000; i++) { const v = -1 + 2 * i / 1000, h = 1e-6; s2 = Math.max(s2, Math.abs((core.antiAt(sh.dy, sh.dF, v + h) - core.antiAt(sh.dy, sh.dF, v - h)) / (2 * h) - core.tableAt(sh.dy, v))); }
+  check('15. the antiderivative\'s slope is the curve between table points too', s2 < 1e-6, 'worst ' + s2.toExponential(1));
+  // Morph runs through the keyframes in order
+  core.morphCurves(sh, keys, F, 4, 1 / 3);
+  let k1 = 0; for (let j = 0; j <= core.CURVE_N; j++) k1 = Math.max(k1, Math.abs(sh.dy[j] - keys[1][j]));
+  core.morphCurves(sh, keys, F, 2, 1);
+  let k2 = 0; for (let j = 0; j <= core.CURVE_N; j++) k2 = Math.max(k2, Math.abs(sh.dy[j] - keys[1][j]));
+  check('15. Morph 1/3 of 4 keyframes is keyframe 2; Morph 1 of 2 keyframes is keyframe 2', k1 < 1e-12 && k2 < 1e-12);
+  // a drawn curve set through the engine is used
+  const off = render(0.4, (e) => { apply(e, { ...PLAIN, sfamily1: 3, shape1: 1, keys1: 2, morph1: 0 }); e.noteOn(48, 100); }).L;
+  const on = render(0.4, (e) => { apply(e, { ...PLAIN, sfamily1: 3, shape1: 1, keys1: 2, morph1: 0 }); e.setCurve(1, 0, [[-1, -1], [-0.2, 1], [0.2, -1], [1, 1]], false); e.noteOn(48, 100); }).L;
+  let diff = 0; for (let i = 0; i < off.length; i++) diff = Math.max(diff, Math.abs(off[i] - on[i]));
+  check('15. setCurve changes the sound', diff > 0.05);
+}
+
+/* ---------- 16. the Shape envelope, Link, velocity and key follow ---------- */
+{
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const bright = (x) => { let s = 0; for (let i = 1; i < x.length; i++) s += (x[i] - x[i - 1]) ** 2; return Math.sqrt(s / x.length) / rms(x); };
+  const fold = { sfamily1: 1, fold1: 1, warp1: 0 };
+  // Shape envelope: brighter at its peak than at its sustain
+  const r = render(1.5, (e) => { apply(e, { ...PLAIN, ...fold, senvdepth1: 1, shapekey1: 0, ...env('senv', 1, [[0.2, 1], [0.4, 0.1]], 2, 3) }); e.noteOn(48, 100); }).L;
+  check('16. the Shape envelope opens the fold and settles', bright(steady(r, 0.18, 0.22)) > 2 * bright(steady(r, 1.0, 1.4)), bright(steady(r, 0.18, 0.22)).toFixed(3) + ' vs ' + bright(steady(r, 1.0, 1.4)).toFixed(3));
+  // Link: the Warp envelope drives Shape; with Link 0 and no Shape envelope the fold stays shut
+  const linked = (link) => render(0.5, (e) => { apply(e, { ...PLAIN, ...fold, senvdepth1: 0, link1: link, shapekey1: 0, ...env('wenv', 1, [[0.01, 1]], 0, 1) }); e.noteOn(48, 100); }).L;
+  const l0 = bright(steady(linked(0), 0.2, 0.5)), l1 = bright(steady(linked(1), 0.2, 0.5)), lm = bright(steady(linked(-1), 0.2, 0.5));
+  check('16. Link 1 lets the Warp envelope fold the wave; Link 0 does not', l1 > 3 * l0, l0.toFixed(3) + ' → ' + l1.toFixed(3));
+  check('16. Link −1 with Shape 0 cannot go below 0: no fold', Math.abs(lm - l0) < 1e-3);
+  // velocity and key follow lower Shape
+  const vel = (v) => bright(steady(render(0.5, (e) => { apply(e, { ...PLAIN, ...fold, shape1: 0.6, velshape1: 1, shapekey1: 0 }); e.noteOn(48, v); }).L, 0.2, 0.5));
+  check('16. Velocity: a soft note is folded less', vel(30) < vel(127), vel(30).toFixed(3) + ' vs ' + vel(127).toFixed(3));
+  const key = (k) => bright(steady(render(0.5, (e) => { apply(e, { ...PLAIN, ...fold, shape1: 0.6, velshape1: 0, shapekey1: k }); e.noteOn(84, 100); }).L, 0.2, 0.5));
+  check('16. Key follow: two octaves above middle C, Shape key follow 1 folds less', key(1) < key(0), key(1).toFixed(3) + ' vs ' + key(0).toFixed(3));
+}
+
+/* ---------- 17. levels through the shaper ---------- */
+{
+  const rms = (x) => { let s = 0; for (const v of x) s += v * v; return Math.sqrt(s / x.length); };
+  const level = (p) => dB(rms(steady(render(0.5, (e) => { apply(e, { ...PLAIN, shapekey1: 0, velshape1: 0, ...p }); e.noteOn(48, 100); }).L, 0.2, 0.5)));
+  const ref = level({});
+  const rows = [];
+  for (const [f, sub] of [[0, 0], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2], [3, 0]]) for (const s of [0.5, 1]) for (const w of [0, 0.6])
+    rows.push([core.SHAPERS[f] + ' ' + sub + ' Shape ' + s + ' Warp ' + w, level({ sfamily1: f, fold1: sub, sat1: sub, shape1: s, warp1: w, h1_1: 1, h3_1: 0.5, h5_1: 0.3 }) - ref]);
+  const lo = Math.min(...rows.map((r) => r[1])), hi = Math.max(...rows.map((r) => r[1]));
+  check('17. every shaper at Shape ½ and 1, Warp 0 and 0.6, within 3.5 dB of the plain wave', lo > -3.5 && hi < 3.5, lo.toFixed(1) + ' to +' + hi.toFixed(1) + ' dB');
+  // the Organ preset's chords never clip
+  const { renderPreset } = require(path.join(__dirname, '..', 'tools', 'render-presets.js'));
+  const { PRESETS } = require(path.join(__dirname, '..', 'reference', 'presets.js'));
+  let worst = 0, name = '';
+  for (const pr of PRESETS) { const { L } = renderPreset(pr); let pk = 0; for (const v of L) pk = Math.max(pk, Math.abs(v)); if (pk > worst) { worst = pk; name = pr.name; } }
+  check('17. no test preset clips', worst < 0.99, 'loudest peak ' + worst.toFixed(2) + ' (' + name + ')');
+}
+
 console.log('\n' + (count - failed) + ' of ' + count + ' tests passed');
 process.exit(failed ? 1 : 0);

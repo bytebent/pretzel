@@ -5,7 +5,7 @@ CZ, bends **time**: how fast each part of the cycle is read. Waveshaping bends *
 Chebyshev harmonics, folding, saturation or a drawn curve. Pretzel chains the two, lets you swap
 or morph their order, and can feed the shaped wave back into its own phase (Twist).
 
-Status: **prototype, batch 02 of 13**. The reference engine plays one line with the CZ-style warp: all the CZ waves and windows (and the hidden ones), a window on any wave, wave pairs, and 8-stage Warp and Amp envelopes, in Poly or Mono. Next: the shaper.
+Status: **prototype, batch 03 of 13**. The reference engine plays one line: the CZ-style warp (all the CZ waves and windows, the hidden ones, a window on any wave, wave pairs) into the shaper (Chebyshev, three folders, three saturators, drawn curves with Morph), with 8-stage Warp, Shape and Amp envelopes and Link, in Poly or Mono. Next: band limiting.
 
 - `design.md`: what Pretzel is and how it works
 - `plan.md`: build batches

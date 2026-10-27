@@ -1,8 +1,9 @@
 /*
- * Pretzel engine v0.1 · bytebent
+ * Pretzel engine v0.2 · bytebent
  *
  * A synth that bends a wave on both axes: phase distortion bends time, waveshaping bends level.
- * Batch 02 (see plan.md): one line with the CZ-style warp.
+ * Batches 02–03 (see plan.md): one line, with the CZ-style warp (Warp = phase distortion) and the
+ * shaper after it.
  *
  *   - Every wave reads one unipolar cosine, c(u) = (1 − cos 2πu)/2, at a warped phase u = g(φ),
  *     and is then centred. Warp 0 puts the pivot at the middle of the cycle: a pure cosine.
@@ -23,9 +24,22 @@
  *     first segment never gets shorter than 4 internal samples.
  *   - 8-stage envelopes (time and level per stage, sustain point, end point) for Warp and Amp.
  *     Amp gain is the envelope level squared (0.5 is −12 dB).
+ *   - The shaper (Shape 0 and Bias 0 pass the wave unchanged in every family):
+ *       Chebyshev  Σ e_k·T_k(x), k = 1…16. Shape fades harmonic k in as Shape^(1 + (k−2)/4), so the
+ *                  sound brightens toward the designed spectrum, and the fundamental moves from 1
+ *                  to its slider; at Shape 1 the harmonics have exactly the sliders' ratios.
+ *                  Tilt and Odd/Even scale all 16 at once.
+ *       Fold       Triangle (reflect at ±1), Sine (sin(G·asin x), a sine of the wave's own phase),
+ *                  Analog (four Lockhart stages in closed form with Lambert W; Esqueda, Pöntynen,
+ *                  Parker & Bilbao 2017). Shape is the fold gain G = 10^Shape, 1 to 10.
+ *       Saturate   tanh, arctan, cubic soft clip, f(d·x)/f(d) with drive d = 16·Shape².
+ *       Drawn      up to four keyframe curves, morphed; Shape fades the curve in. Each curve keeps
+ *                  its antiderivative for antialiasing (batch 04).
+ *     Bias offsets the input (x + b)/(1 + |b|), for even harmonics. The Shape envelope, Link (the
+ *     Warp envelope also driving Shape), key follow and velocity set Shape per sample.
  *   - Levels are evened out: every block the voice measures the RMS of its wave at the current
- *     Warp and divides by it to the power 0.7, as in Throat, so a narrow pulse or a window does not
- *     drop the level by up to 16 dB.
+ *     Warp and Shape and divides by it to the power 0.7, as in Throat, so a narrow pulse, a window
+ *     or a shaper does not move the level by up to 16 dB.
  *
  * Everything runs at 4x the host rate in fixed 32-sample blocks, then is decimated with a
  * 128-tap windowed-sinc FIR, as in Throat and Syrinx. process() never allocates. Same seed and
@@ -114,12 +128,162 @@
   function pivotOf(a, cap) { return Math.max(0.5 * Math.pow(2, -PIVOT_OCT * a), cap); }
   function resoOf(a, kmax) { return Math.min(Math.pow(RESO_MAX, a), kmax); }
 
+  /* ---------- the shaper ---------- */
+  const SHAPERS = ['Chebyshev', 'Fold', 'Saturate', 'Drawn'];
+  const FOLDS = ['Triangle', 'Sine', 'Analog'];
+  const SATS = ['Tanh', 'Arctan', 'Cubic'];
+  const NH = 16;                // Chebyshev harmonics
+  const FOLD_MAX = 10;          // fold gain at Shape 1
+  const SAT_MAX = 16;           // saturation drive at Shape 1 (d = 16·Shape²)
+  const CURVE_N = 256;          // drawn curve table: CURVE_N + 1 points over −1 … 1
+  const MAX_KEYS = 4;           // drawn keyframes
+
+  // Lockhart wavefolder (Esqueda, Pöntynen, Parker & Bilbao 2017, eq. 28): R = 15 kΩ, RL = 7.5 kΩ,
+  // Is = 1e−17 A, VT = 25.864 mV; four stages between a 1/3 pre-gain and a ×3 post-gain (their §6)
+  const LK_VT = 0.025864, LK_A = 2 * 7500 / 15000, LK_B = (2 * 7500 + 15000) / (LK_VT * 15000);
+  const LK_LND = Math.log(7500 * 1e-17 / LK_VT);
+  // Lambert W (principal branch) of e^L, for any L
+  function lambertWexp(L) {
+    if (L < 1) {
+      const z = Math.exp(L);
+      let w = z < 0.3 ? z * (1 - z * (1 - 1.5 * z)) : 0.5 * L + 0.5;
+      for (let i = 0; i < 4; i++) { const ew = Math.exp(w); w -= (w * ew - z) / (ew * (w + 1)); }
+      return w;
+    }
+    let w = L - Math.log(L);
+    for (let i = 0; i < 4; i++) w -= (w + Math.log(w) - L) * w / (1 + w);
+    return w;
+  }
+  function lockhart(v) {
+    if (v === 0) return 0;
+    const l = v > 0 ? 1 : -1;
+    return LK_A * v - l * LK_VT * lambertWexp(LK_LND + l * LK_B * v);
+  }
+  function analogFold(v) {
+    let u = v / 3;
+    for (let i = 0; i < 4; i++) u = lockhart(u);
+    return 3 * u;
+  }
+  function triFold(v) {
+    let t = (v + 1) * 0.25;
+    t -= Math.floor(t);
+    return 1 - 4 * Math.abs(t - 0.5);
+  }
+  // tanh, arctan and cubic soft clip, each scaled so f(d·x)/f(d) has a peak of 1
+  function satCurve(t, u) {
+    switch (t) {
+      case 0: return Math.tanh(u);
+      case 1: return Math.atan(u);
+      default: return u >= 1 ? 2 / 3 : u <= -1 ? -2 / 3 : u - u * u * u / 3;
+    }
+  }
+
+  // drawn curves: a table of CURVE_N + 1 values over −1 … 1, and its antiderivative F1 (from −1),
+  // exact for the straight lines between table points
+  function curveTable(points, smooth) {
+    const y = new Float64Array(CURVE_N + 1);
+    const pts = points.slice().sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i <= CURVE_N; i++) {
+      const x = -1 + 2 * i / CURVE_N;
+      let j = 0;
+      while (j < pts.length - 2 && pts[j + 1][0] < x) j++;
+      const [x1, y1] = pts[j], [x2, y2] = pts[Math.min(j + 1, pts.length - 1)];
+      const f = x2 > x1 ? clamp((x - x1) / (x2 - x1), 0, 1) : 0;
+      if (!smooth) { y[i] = y1 + (y2 - y1) * f; continue; }
+      // Catmull-Rom through the points
+      const y0 = j > 0 ? pts[j - 1][1] : 2 * y1 - y2, y3 = j + 2 < pts.length ? pts[j + 2][1] : 2 * y2 - y1;
+      y[i] = clamp(y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0))), -1, 1);
+    }
+    return y;
+  }
+  function antiderivative(y) {
+    const F = new Float64Array(CURVE_N + 1), h = 2 / CURVE_N;
+    for (let i = 1; i <= CURVE_N; i++) F[i] = F[i - 1] + 0.5 * h * (y[i - 1] + y[i]);
+    return F;
+  }
+  function tableAt(y, v) {
+    const x = (clamp(v, -1, 1) + 1) * 0.5 * CURVE_N, i = Math.min(CURVE_N - 1, Math.floor(x)), f = x - i;
+    return y[i] + (y[i + 1] - y[i]) * f;
+  }
+  function antiAt(y, F, v) {      // F1 at v (linear between table points, so quadratic inside one)
+    const x = (clamp(v, -1, 1) + 1) * 0.5 * CURVE_N, i = Math.min(CURVE_N - 1, Math.floor(x)), f = x - i, h = 2 / CURVE_N;
+    return F[i] + h * f * (y[i] + 0.5 * (y[i + 1] - y[i]) * f);
+  }
+  // the four default keyframes: soft S, terraces, a sine fold, a full-wave rectifier
+  const DEFAULT_CURVES = [
+    (v) => Math.sin(Math.PI * v / 2),
+    (v) => v - Math.sin(4 * Math.PI * v) / (4 * Math.PI),
+    (v) => Math.sin(1.5 * Math.PI * v),
+    (v) => 2 * Math.abs(v) - 1,
+  ].map((f) => { const y = new Float64Array(CURVE_N + 1); for (let i = 0; i <= CURVE_N; i++) y[i] = f(-1 + 2 * i / CURVE_N); return y; });
+
+  // one line's shaper settings for a block. e: Chebyshev weights at Shape 1 (after Tilt, Odd/Even);
+  // c: scratch for the weights at the current Shape; dy, dF: the morphed drawn curve and its F1.
+  function makeShaper() {
+    return { fam: 0, sub: 0, bias: 0, e: new Float64Array(NH + 1), c: new Float64Array(NH + 2), dy: new Float64Array(CURVE_N + 1), dF: new Float64Array(CURVE_N + 1) };
+  }
+  // the shaped value of x (−1 … 1) at Shape s
+  function shapeSample(sh, x, s) {
+    const b = sh.bias;
+    if (s === 0 && b === 0) return x;
+    const v = b === 0 ? x : (x + b) / (1 + Math.abs(b));
+    switch (sh.fam) {
+      case 0: {                         // Chebyshev, by Clenshaw's recurrence
+        // harmonic k comes in as Shape^(1 + (k−2)/4), like a waveshaping index (harmonic 2 first and
+        // linearly, higher ones later); the fundamental moves in a straight line from 1 to its
+        // slider. Every exponent is at least 1, so the weights still add up to at most 1.
+        const e = sh.e, c = sh.c, r = Math.sqrt(Math.sqrt(s));
+        let rk = s / r;
+        for (let k = 2; k <= NH; k++) { rk *= r; c[k] = e[k] * rk; }
+        c[1] = 1 - s + s * e[1];
+        let b1 = 0, b2 = 0;
+        for (let k = NH; k >= 1; k--) { const t = c[k] + 2 * v * b1 - b2; b2 = b1; b1 = t; }
+        return v * b1 - b2;
+      }
+      case 1: {                         // Fold
+        const g = Math.pow(FOLD_MAX, s);   // 1 → 10, evenly in log: 1.8 at Shape ¼, 3.2 at ½
+        if (sh.sub === 0) return triFold(g * v);
+        if (sh.sub === 1) return Math.sin(g * Math.asin(clamp(v, -1, 1)));
+        // the Lockhart stages bend slightly even at gain 1; adding back that bend keeps Shape 0 exact
+        return analogFold(g * v) - analogFold(v) + v;
+      }
+      case 2: {                         // Saturate
+        const d = SAT_MAX * s * s;
+        if (d < 1e-6) return v;
+        return satCurve(sh.sub, d * v) / satCurve(sh.sub, d);
+      }
+      default:                          // Drawn: Shape fades the curve in
+        return v + s * (tableAt(sh.dy, v) - v);
+    }
+  }
+  // Chebyshev weights at Shape 1: h_k × k^Tilt, and Odd/Even (> 0 cuts even harmonics, < 0 cuts
+  // odd ones above the fundamental). Scaled so they add up to 1: the output never passes ±1
+  // (|T_k| ≤ 1), and the harmonics keep exactly the ratios of the sliders.
+  function chebWeights(e, h, tilt, oe) {
+    let sum = 0;
+    for (let k = 1; k <= NH; k++) {
+      let g = h[k - 1] * Math.pow(k, tilt);
+      if (k % 2 === 0 && oe > 0) g *= 1 - oe;
+      if (k % 2 === 1 && k > 1 && oe < 0) g *= 1 + oe;
+      e[k] = g; sum += g;
+    }
+    if (sum < 1e-9) { e.fill(0); e[1] = 1; return; }
+    for (let k = 1; k <= NH; k++) e[k] /= sum;
+  }
+  // the morphed drawn curve: Morph 0–1 runs through the keyframes in order. Linear morphing of the
+  // curves and of their antiderivatives with the same weights gives the same result.
+  function morphCurves(sh, keys, F, n, m) {
+    const x = clamp(m, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(x)), f = x - i;
+    const a = keys[i], b = keys[i + 1], Fa = F[i], Fb = F[i + 1];
+    for (let j = 0; j <= CURVE_N; j++) { sh.dy[j] = a[j] + (b[j] - a[j]) * f; sh.dF[j] = Fa[j] + (Fb[j] - Fa[j]) * f; }
+  }
+
   // mean, RMS and peak (DC removed) of a line's wave over one cycle (both cycles of a wave pair).
   // The cycle is cut at the warp's breakpoints and each piece gets the same number of points, so
   // a narrow pulse is measured as well as a wide one.
   const lvl = { mean: 0, rms: 1, peak: 1 };
   const cuts = new Float64Array(8);
-  function levelOf(w0, w1, win, p, k) {
+  function levelOf(w0, w1, win, p, k, sh, sv) {
     let nc = 0;
     for (const c of [0, p, 2 * p, 0.5, 0.5 + p, 1]) if (c <= 1) cuts[nc++] = c;
     cuts.subarray(0, nc).sort();
@@ -131,7 +295,8 @@
         const a = cuts[j - 1], len = cuts[j] - a;
         if (len <= 0) continue;
         for (let i = 0; i < LEVEL_PTS; i++) {
-          const x = waveSample(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k);
+          let x = waveSample(w, win, a + len * (i + 0.5) / LEVEL_PTS, p, k);
+          if (sh) x = shapeSample(sh, x, sv);
           m += x * len; s += x * x * len;
           if (x > hi) hi = x; if (x < lo) lo = x;
         }
@@ -145,7 +310,11 @@
   // past LEVEL_PEAK (a narrow pulse is spiky: matching its RMS would make it clip)
   function levelGain(l) { return clamp(Math.min(Math.pow(Math.SQRT1_2 / l.rms, LEVEL_POW), LEVEL_PEAK / l.peak), 1 / LEVEL_MAX, LEVEL_MAX); }
 
-  const core = { levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX };
+  const core = {
+    levelOf, levelGain, WAVES, WINDOWS, warpU, windowW, waveSample, carrier, pivotOf, resoOf, PIVOT_OCT, RESO_MAX,
+    SHAPERS, FOLDS, SATS, NH, CURVE_N, makeShaper, shapeSample, chebWeights, morphCurves, curveTable, antiderivative,
+    tableAt, antiAt, lockhart, analogFold, lambertWexp, DEFAULT_CURVES,
+  };
 
   /* ---------- parameters ---------- */
   // ids, defaults and ranges: the one table the C++ core and the UI copy.
@@ -153,6 +322,7 @@
   const ENV_DEFAULTS = {
     aenv: { t: [0.005, 0.5, 0.3], l: [1, 0.7, 0], sus: 2, end: 3 },
     wenv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
+    senv: { t: [0.02, 0.8, 0.4], l: [0.8, 0.4, 0], sus: 2, end: 3 },
   };
   function envParams(name, line) {
     const d = ENV_DEFAULTS[name], out = [];
@@ -177,7 +347,23 @@
     { id: 'wenvdepth1', def: 1, min: -1, max: 1 },
     { id: 'velwarp1', def: 0.3, min: 0, max: 1 },
     { id: 'velamp1', def: 0.7, min: 0, max: 1 },
+    // shaper, line 1
+    { id: 'sfamily1', def: 0, min: 0, max: 3, step: 1 },         // SHAPERS
+    { id: 'shape1', def: 0, min: 0, max: 1 },                    // drive into the shaper, before the envelope
+    { id: 'bias1', def: 0, min: -1, max: 1 },                    // input offset: even harmonics
+    ...Array.from({ length: NH }, (_, i) => ({ id: 'h' + (i + 1) + '_1', def: i === 0 ? 1 : 0, min: 0, max: 1 })),   // Chebyshev harmonics
+    { id: 'tilt1', def: 0, min: -1, max: 1 },                    // harmonic k × k^Tilt
+    { id: 'oddeven1', def: 0, min: -1, max: 1 },                 // > 0 cuts even, < 0 cuts odd (above the fundamental)
+    { id: 'fold1', def: 1, min: 0, max: 2, step: 1 },            // FOLDS
+    { id: 'sat1', def: 0, min: 0, max: 2, step: 1 },             // SATS
+    { id: 'keys1', def: 4, min: 2, max: MAX_KEYS, step: 1 },     // drawn keyframes in use
+    { id: 'morph1', def: 0, min: 0, max: 1 },                    // through the drawn keyframes
+    { id: 'shapekey1', def: 0.3, min: 0, max: 1 },               // key follow: less shape above middle C
+    { id: 'senvdepth1', def: 0, min: -1, max: 1 },
+    { id: 'link1', def: 0, min: -1, max: 1 },                    // the Warp envelope also drives Shape
+    { id: 'velshape1', def: 0.3, min: 0, max: 1 },
     ...envParams('wenv', 1),
+    ...envParams('senv', 1),
     ...envParams('aenv', 1),
     // pitch and output
     { id: 'transpose', def: 0, min: -24, max: 24, step: 1 },
@@ -267,8 +453,10 @@
       this.note = -1; this.held = false; this.active = false; this.age = 0;
       this.vel = 1; this.oct = 0; this.targetOct = 0; this.glideStep = 0;
       this.ph = 0; this.odd = 0;
-      this.wenv = new Env(eng, 'wenv1'); this.aenv = new Env(eng, 'aenv1');
+      this.wenv = new Env(eng, 'wenv1'); this.senv = new Env(eng, 'senv1'); this.aenv = new Env(eng, 'aenv1');
+      this.sh = makeShaper();
       this.dcx = 0; this.dcy = 0; this.gain = 1;
+      this.k = {};          // per-block settings, filled by settings()
     }
     // glide: a straight line in pitch that arrives in the Glide time, whatever the interval
     setTarget(note, glide) {
@@ -282,64 +470,77 @@
       const wasActive = this.active;
       this.vel = clamp(vel / 127, 0, 1);
       this.active = true; this.held = true; this.age = ++this.eng.ageCounter;
-      if (!wasActive) { this.ph = 0; this.odd = 0; this.aenv.v = 0; this.wenv.v = 0; }
-      this.wenv.trigger(); this.aenv.trigger();
+      if (!wasActive) { this.ph = 0; this.odd = 0; this.aenv.v = 0; this.wenv.v = 0; this.senv.v = 0; }
+      this.wenv.trigger(); this.senv.trigger(); this.aenv.trigger();
       if (!wasActive) this.primeDc();
     }
     release() {
       if (!this.held) return;
       this.held = false;
-      this.wenv.release(); this.aenv.release();
+      this.wenv.release(); this.senv.release(); this.aenv.release();
       if (this.aenv.done && this.aenv.v > 0) this.aenv.fade(0.01);
     }
+    // everything that is fixed for one block: pitch, waves, Warp and Shape scaling, the shaper
+    settings() {
+      const e = this.eng, P = e.p, k = this.k;
+      const hz = 440 * Math.pow(2, this.oct + e.pitchOct), note = 69 + 12 * this.oct;
+      k.hz = hz; k.inc = hz / e.srOS;
+      const vl = 1 - this.vel;
+      k.vw = (1 - P[PINDEX.velwarp1] * vl) * Math.min(1, Math.pow(2, -P[PINDEX.warpkey1] * (note - 60) / 12));
+      k.vs = (1 - P[PINDEX.velshape1] * vl) * Math.min(1, Math.pow(2, -P[PINDEX.shapekey1] * (note - 60) / 12));
+      k.va = (1 - P[PINDEX.velamp1] * vl) * LEVEL;
+      k.wbase = P[PINDEX.warp1]; k.wdepth = P[PINDEX.wenvdepth1];
+      k.sbase = P[PINDEX.shape1]; k.sdepth = P[PINDEX.senvdepth1]; k.link = P[PINDEX.link1];
+      const cap = Math.min(0.5, PIVOT_MIN_SAMPLES * hz / e.srOS);
+      k.lnCap = Math.log2(cap / 0.5);
+      k.kmaxLn = Math.log(Math.max(1, RESO_NYQ * e.sr / hz)); k.lnReso = Math.log(RESO_MAX);
+      const pr = Math.round(P[PINDEX.pair1]);
+      k.w0 = Math.round(P[PINDEX.wave1]); k.w1 = pr > 0 ? pr - 1 : k.w0; k.win = Math.round(P[PINDEX.window1]);
+      // the shaper
+      const sh = this.sh;
+      sh.fam = Math.round(P[PINDEX.sfamily1]); sh.bias = P[PINDEX.bias1];
+      sh.sub = sh.fam === 1 ? Math.round(P[PINDEX.fold1]) : sh.fam === 2 ? Math.round(P[PINDEX.sat1]) : 0;
+      if (sh.fam === 0) {
+        const h = e.harm;
+        for (let i = 0; i < NH; i++) h[i] = P[PINDEX.h1_1 + i];
+        chebWeights(sh.e, h, P[PINDEX.tilt1], P[PINDEX.oddeven1]);
+      } else if (sh.fam === 3) {
+        const c = e.curves[0];
+        morphCurves(sh, c.keys, c.F, Math.round(P[PINDEX.keys1]), P[PINDEX.morph1]);
+      }
+      return k;
+    }
+    warpAt(we) { const k = this.k, a = clamp(k.wbase + k.wdepth * we, 0, 1) * k.vw; return a; }
+    shapeAt(we, se) { const k = this.k; return clamp(k.sbase + k.sdepth * se + k.link * we, 0, 1) * k.vs; }
     // start the DC blocker at the wave's mean, so a windowed wave does not thump at note on,
     // and the level at the wave's own
     primeDc() {
-      const P = this.eng.p, w0 = Math.round(P[PINDEX.wave1]), pr = Math.round(P[PINDEX.pair1]);
-      const s = this.shapeNow(0), l = levelOf(w0, pr > 0 ? pr - 1 : w0, Math.round(P[PINDEX.window1]), s.p, s.k);
+      const k = this.settings(), a = this.warpAt(0);
+      const l = levelOf(k.w0, k.w1, k.win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a, k.lnCap)), Math.exp(Math.min(a * k.lnReso, k.kmaxLn)), this.sh, this.shapeAt(0, 0));
       this.dcx = l.mean; this.dcy = 0; this.gain = levelGain(l);
     }
-    // pivot and resonance ratio for a Warp envelope value
-    shapeNow(we) {
-      const e = this.eng, P = e.p;
-      const hz = 440 * Math.pow(2, this.oct + e.pitchOct);
-      const note = 69 + 12 * this.oct;
-      const key = Math.min(1, Math.pow(2, -P[PINDEX.warpkey1] * (note - 60) / 12));
-      const vw = 1 - P[PINDEX.velwarp1] * (1 - this.vel);
-      const a = clamp(P[PINDEX.warp1] + P[PINDEX.wenvdepth1] * we, 0, 1) * vw * key;
-      const cap = Math.min(0.5, PIVOT_MIN_SAMPLES * hz / e.srOS);
-      const kmax = Math.max(1, RESO_NYQ * e.sr / hz);
-      return { p: pivotOf(a, cap), k: resoOf(a, kmax), hz };
-    }
     render(n, out) {
-      const e = this.eng, P = e.p;
+      const e = this.eng;
       // glide (mono): pitch moves toward the target, per block
       const dOct = this.targetOct - this.oct, step = this.glideStep * n;
       this.oct = step > 0 && Math.abs(dOct) > step ? this.oct + Math.sign(dOct) * step : this.targetOct;
-      const hz = 440 * Math.pow(2, this.oct + e.pitchOct), inc = hz / e.srOS;
-      const note = 69 + 12 * this.oct;
-      const key = Math.min(1, Math.pow(2, -P[PINDEX.warpkey1] * (note - 60) / 12));
-      const vw = (1 - P[PINDEX.velwarp1] * (1 - this.vel)) * key;
-      const va = (1 - P[PINDEX.velamp1] * (1 - this.vel)) * LEVEL;
-      const base = P[PINDEX.warp1], depth = P[PINDEX.wenvdepth1];
-      const cap = Math.min(0.5, PIVOT_MIN_SAMPLES * hz / e.srOS), lnCap = Math.log2(cap / 0.5);
-      const kmaxLn = Math.log(Math.max(1, RESO_NYQ * e.sr / hz)), lnReso = Math.log(RESO_MAX);
-      const w0 = Math.round(P[PINDEX.wave1]), pr = Math.round(P[PINDEX.pair1]);
-      const w1 = pr > 0 ? pr - 1 : w0, win = Math.round(P[PINDEX.window1]);
+      const k = this.settings(), sh = this.sh;
+      const { inc, vw, vs, va, wbase, wdepth, sbase, sdepth, link, lnCap, kmaxLn, lnReso, w0, w1, win } = k;
       const R = e.dcR;
-      // level: measured at the Warp the block starts with, moved to across the block
-      const a0 = clamp(base + depth * this.wenv.v, 0, 1) * vw;
-      const g1 = levelGain(levelOf(w0, w1, win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a0, lnCap)), Math.exp(Math.min(a0 * lnReso, kmaxLn))));
+      // level: measured at the Warp and Shape the block starts with, moved to across the block
+      const a0 = this.warpAt(this.wenv.v);
+      const g1 = levelGain(levelOf(w0, w1, win, 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a0, lnCap)), Math.exp(Math.min(a0 * lnReso, kmaxLn)), sh, this.shapeAt(this.wenv.v, this.senv.v)));
       let g = this.gain;
       const dg = (g1 - g) / n;
       let ph = this.ph, odd = this.odd, dcx = this.dcx, dcy = this.dcy;
-      const wenv = this.wenv, aenv = this.aenv;
+      const wenv = this.wenv, senv = this.senv, aenv = this.aenv;
       for (let i = 0; i < n; i++) {
-        const we = wenv.next(), ae = aenv.next();
-        const a = clamp(base + depth * we, 0, 1) * vw;
+        const we = wenv.next(), se = senv.next(), ae = aenv.next();
+        const a = clamp(wbase + wdepth * we, 0, 1) * vw;
         const p = 0.5 * Math.pow(2, Math.max(-PIVOT_OCT * a, lnCap));
-        const k = Math.exp(Math.min(a * lnReso, kmaxLn));
-        const x = 2 * carrier(warpU(odd ? w1 : w0, ph, p, k)) * windowW(win, ph) - 1;
+        const kr = Math.exp(Math.min(a * lnReso, kmaxLn));
+        const s = clamp(sbase + sdepth * se + link * we, 0, 1) * vs;
+        const x = shapeSample(sh, 2 * carrier(warpU(odd ? w1 : w0, ph, p, kr)) * windowW(win, ph) - 1, s);
         const y = x - dcx + R * dcy; dcx = x; dcy = y;
         g += dg;
         out[i] += y * ae * ae * g * va;
@@ -370,6 +571,12 @@
       this.dc = { x: 0, y: 0, R: 1 - TWO_PI * 10 / sampleRate };
       this.volSm = Math.pow(10, PARAMS[PINDEX.volume].def / 20);
       this.smooth = 1 - Math.exp(-BLOCK / (0.02 * sampleRate));
+      this.harm = new Float64Array(NH);
+      // drawn keyframes per line (line 2 comes in batch 09), with their antiderivatives
+      this.curves = [0].map(() => {
+        const keys = DEFAULT_CURVES.map((y) => Float64Array.from(y));
+        return { keys, F: keys.map(antiderivative) };
+      });
       this.voices = [];
       for (let i = 0; i < MAX_VOICES; i++) this.voices.push(new Voice(this));
       this.info = { voices: 0, idle: true };
@@ -386,6 +593,13 @@
       if (id === 'mode') this.allNotesOff();
     }
     getParam(id) { return this.p[PINDEX[id]]; }
+    // a drawn keyframe: points [[x, y], …] with x and y in −1 … 1; smooth: Catmull-Rom, else straight
+    setCurve(line, key, points, smooth) {
+      const c = this.curves[line - 1];
+      if (!c || key < 0 || key >= MAX_KEYS || !points || points.length < 2) return;
+      c.keys[key] = curveTable(points.map(([x, y]) => [clamp(x, -1, 1), clamp(y, -1, 1)]), smooth);
+      c.F[key] = antiderivative(c.keys[key]);
+    }
     setBend(norm) { this.bendNorm = clamp(norm, -1, 1); }
 
     noteOn(note, vel) {

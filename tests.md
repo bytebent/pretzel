@@ -4,7 +4,59 @@ Quick results per batch: tests, experiments and pictures. Pictures live in `docs
 tests with `node tests/engine-test.js`. Presets are the test presets in `reference/presets.js`;
 the ones marked `design` are those of `design.md` §11.
 
-**Now: 45 engine tests passing** (under 1 s). Renders: `node tools/render-presets.js`.
+**Now: 76 engine tests passing** (about 6 s). Renders: `node tools/render-presets.js`.
+
+## Batch 03 · shaper
+
+The four shaper families after the warp: Chebyshev (16 harmonics, Tilt, Odd/Even), Fold (Triangle,
+Sine, Analog), Saturate (Tanh, Arctan, Cubic) and Drawn (four keyframes, Morph, stored
+antiderivatives). Bias, the Shape envelope, Link, key follow and velocity. No antialiasing on the
+shaper yet: batch 04.
+
+![Transfer curves at Shape ¼, ½ and 1, and the four drawn keyframes](docs/tests/03-curves.png)
+
+- **Shape 0 is exact** in all 8 shapers (difference 0), and a tiny Shape moves none of them by
+  more than 0.1%. The Analog folder bends the wave slightly even at gain 1 (its peak came out at
+  0.94); that bend is added back, so it is exact too.
+- **Chebyshev is exact.** A full-scale cosine at Shape 1 gives each harmonic at its slider's share
+  (error 4e−16), nothing above 16, no DC. After a warp, harmonic 3 alone is the cosine read at 3 ×
+  the warped phase, to the cosine table's precision (3e−6): the identity behind batch 04's exact
+  band limit holds in the engine.
+- **The weights are scaled to add up to 1.** First render: Tilt and Odd-Even (all 16 harmonics at
+  full, Tilt +1) clipped hard, because the sum reached 136. Scaled, the output can never pass ±1
+  and the harmonics keep the sliders' ratios.
+- **How Shape brings the harmonics in** took three tries, judged by the energy-weighted harmonic
+  number at Shape 0, ¼, ½, ¾, 1 (all 16 sliders up):
+  - Shape^((k−1)/2), fundamental crossfaded: 1.00 → 1.00 → 1.03 → 1.44 → 8.50. Almost nothing
+    until the top of the knob.
+  - Shape^((k−1)/4): earlier, but a Shape of 0.0001 already moved the wave by 6% (the curve is
+    vertical at 0).
+  - Shape^(1 + (k−2)/4), fundamental in a straight line from 1 to its slider: 1.00 → 1.00 → 1.04
+    → 1.78 → 8.50, harmonic 2 comes in linearly, and at Shape ½ harmonics 2, 8, 16 sit at −30, −39,
+    −51 dB. Kept. Still weighted toward the top of the knob when every slider is up: worth a listen
+    in the Shaper tour and Tilt presets.
+- **Fold gain** was 1 + 9·Shape; at Shape ¼ the triangle already folded three times. Now
+  10^Shape (1.8 at ¼, 3.2 at ½). More folds at every step for all three folders (zero crossings
+  per cycle 2 → 6 → 10 → 18 at Shape 0, 0.4, 0.7, 1).
+- **Saturate**: odd harmonics only at Bias 0 for all three curves; Bias 0.5 brings harmonic 2 to
+  −6 to −8 dB. Everything stays within ±1.
+- **Lambert W** (for the Analog folder) solves w·e^w = e^L from L = −40 to 300 to 1e−7. The first
+  version gave NaN for small arguments; small values now use a series and Newton's method in plain
+  form.
+- **Drawn**: morphing the antiderivatives gives the antiderivative of the morph (1e−15), and the
+  stored antiderivative's slope is the curve between table points too (3e−8). Ready for ADAA.
+- **Envelopes and Link.** The Shape envelope opens the fold and settles; Link 1 lets the Warp
+  envelope fold the wave; soft notes and high notes (with key follow) fold less.
+- **Levels** through every shaper at Shape ½ and 1, Warp 0 and 0.6: −1.6 to +0.9 dB from the plain
+  wave. No test preset clips (loudest peak 0.63).
+
+![Spectrograms: Shaper tour, Folded Saw, Tilt and Odd-Even, Bias, Drawn morph, Linked](docs/tests/03-spectrograms.png)
+
+Folded Saw shows the aliasing still to come off (the curved lines that fall as the fold rises):
+batch 04.
+
+Renders: the design presets Organ Pretzel, Linked and Folded Saw, plus Shaper tour, Drawn morph,
+Bias, and Tilt and Odd-Even. Presets 01–07 sound as before (Shape 0 changes nothing).
 
 ## Batch 02 · one line, CZ warp
 

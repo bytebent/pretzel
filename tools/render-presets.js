@@ -46,6 +46,11 @@ function renderPreset(pr) {
       const [, type, a, b] = ev[k++];
       if (type === 1) e.noteOn(a, b); else if (type === 0) e.noteOff(a); else for (const id in a) e.setParam(id, a[id]);
     }
+    // sweeps: [{ id, from, to, start, end }] move a parameter in a straight line between two times
+    for (const sw of pr.sweeps || []) {
+      const t = i / SR;
+      if (t >= sw.start - BL / SR && t <= sw.end + BL / SR) e.setParam(sw.id, sw.from + (sw.to - sw.from) * Math.min(1, Math.max(0, (t - sw.start) / (sw.end - sw.start))));
+    }
     const m = Math.min(BL, n - i);
     e.process(tl, tr, m);
     L.set(tl.subarray(0, m), i); R.set(tr.subarray(0, m), i);

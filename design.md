@@ -163,27 +163,39 @@ offsets the input to add even harmonics. [Decided: all four families]
 S(x) = Σ h_k·T_k(x), for k = 1…16. The identity T_k(cos θ) = cos kθ means a full-scale cosine
 produces exactly harmonic k at level h_k.
 
-- **Harmonics**: 16 sliders, h_1…h_16. Plus **Tilt** and **Odd/Even**, which set all 16 at once.
-- **Shape** scales the input (a·cos θ), so the sound starts nearly pure and brightens toward the
-  designed spectrum. This is the waveshaping version of DCW. A normalising gain keeps loudness
-  steady.
+- **Harmonics**: 16 sliders, h_1…h_16. Plus **Tilt** (harmonic k × k^Tilt) and **Odd/Even**
+  (> 0 cuts even harmonics, < 0 cuts odd ones above the fundamental), which scale all 16 at once.
+  The weights are scaled to add up to 1, so the output never passes ±1 and the harmonics keep
+  exactly the sliders' ratios.
+- **Shape** fades the harmonics in, like a waveshaping index: harmonic k comes in as
+  Shape^(1 + (k−2)/4), so harmonic 2 arrives first and the high ones last, and the fundamental moves
+  from 1 to its slider. Shape 0 is the wave unchanged. This is the waveshaping version of DCW.
+  (Scaling the input, a·cos θ, as Le Brun does, cannot leave Shape 0 unchanged.) [Decided, batch 03]
 - **After a warp**, the shaper turns cos(2π·g) into Σ h_k·cos(2πk·g), a stack of warped
   harmonics. That is what makes exact band limiting possible (section 9).
 
 ### 5.2 Fold [Decided]
 
 - **Triangle** fold: reflect at ±1.
-- **Sine** fold: sin(gain·x·π/2).
-- **Analog**: the Lockhart folder in closed form (Esqueda, Pöntynen, Parker and Bilbao, 2017).
-- **Shape** is the fold gain, from 1 to 10.
+- **Sine** fold: sin(G·asin x). At G = 1 it is the wave itself; on a cosine it is a sine of the
+  wave's own phase, folded G times.
+- **Analog**: four Lockhart stages in closed form, with Lambert W, between a 1/3 pre-gain and a ×3
+  post-gain (Esqueda, Pöntynen, Parker and Bilbao, 2017). The stages bend the wave a little even at
+  G = 1; that bend is added back, so Shape 0 is exact.
+- **Shape** is the fold gain G = 10^Shape: 1 to 10, evenly in log (1.8 at ¼, 3.2 at ½).
+  [Decided, batch 03]
 
 ### 5.3 Saturate [Decided]
 
-tanh, arctan and a cubic soft clip. **Shape** is the drive. Bias makes the curve asymmetric.
+tanh, arctan and a cubic soft clip, as f(d·x)/f(d), so the peak stays at 1. **Shape** sets the
+drive, d = 16·Shape². Bias makes the curve asymmetric.
 
 ### 5.4 Drawn [Decided]
 
-- Two to four **keyframe curves**, drawn as breakpoints or splines. **Morph** crossfades them.
+- Two to four **keyframe curves**, drawn as breakpoints or splines. **Morph** runs through them in
+  order. **Shape** fades the curve in (Shape 0 is the wave unchanged).
+- Four defaults: a soft S, terraces, a sine fold and a full-wave rectifier (which sounds an octave
+  up).
 - Each curve stores its first antiderivative, computed in double precision, for antialiasing
   (section 9). Morphing the curves and morphing the antiderivatives with the same weights give the
   same result, so morphing costs nothing extra.
@@ -322,10 +334,11 @@ Defaults are design values to tune by ear. **M** marks a knob that the free modu
 | Shaper | `sfamily` | Chebyshev, Fold, Saturate, Drawn | Chebyshev | |
 | | `shape` | 0–1 | 0 | M. Drive into the shaper |
 | | `bias` | −1 to +1 | 0 | M. Asymmetry |
-| | `h1`…`h16` | 0–1 | 1, 0 … | Chebyshev harmonics |
+| | `h1`…`h16` | 0–1 | 1, 0 … | Chebyshev harmonics (ids `h1_1` … `h16_1` on line 1) |
 | | `tilt`, `oddeven` | −1 to +1 | 0, 0 | M. Set all harmonics |
 | | `fold` | Triangle, Sine, Analog | Sine | |
 | | `sat` | Tanh, Arctan, Cubic | Tanh | |
+| | `keys` | 2–4 | 4 | Drawn keyframes in use |
 | | `morph` | 0–1 | 0 | M. Drawn keyframes |
 | | `shapekey` | 0–1 | 0.3 | Key follow |
 | Knot | `order` | Warp→Shape, Shape→Warp, Morph | Warp→Shape | |
